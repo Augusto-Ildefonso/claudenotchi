@@ -232,4 +232,34 @@ import Testing
         #expect(notchScreen().topInset == 32)
         #expect(plainScreen().topInset == NotchGeometry.fallbackSize.height)
     }
+
+    // MARK: the closed pill (where the show/hide animation starts and ends)
+
+    @Test func theClosedPillOnANotchScreenIsTheNotchItself() {
+        let g = notchScreen()
+        #expect(g.closedFrame == g.notchRect, "it widens out of the notch, so it begins exactly over it")
+    }
+
+    @Test func theClosedPillOnAPlainScreenIsANarrowStubAtTheTopCenter() {
+        let g = plainScreen()
+        #expect(g.closedFrame.midX == 960)
+        #expect(g.closedFrame.maxY == 1080)
+        #expect(g.closedFrame.height == NotchGeometry.fallbackSize.height)
+        #expect(g.closedFrame.width < NotchGeometry.fallbackSize.width / 2)
+    }
+
+    @Test func everyPresentationGrowsOutOfTheClosedPill() {
+        for g in [notchScreen(), notchScreen(extension: 44), plainScreen()] {
+            for presentation in [PillPresentation.collapsed, .hover, .attention] {
+                #expect(g.frame(for: presentation).contains(g.closedFrame), "\(presentation)")
+            }
+        }
+    }
+
+    @Test func theClosedPillStaysCenteredOnASecondaryDisplay() {
+        let g = notchScreen(origin: CGPoint(x: -1512, y: 100))
+        #expect(g.closedFrame.midX == g.collapsedFrame.midX)
+        #expect(g.closedFrame.maxY == g.collapsedFrame.maxY)
+    }
 }
+

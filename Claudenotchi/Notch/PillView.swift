@@ -24,15 +24,22 @@ struct PillView: View {
         Color.clear
             .overlay(alignment: .topLeading) {
                 collapsedContent.opacity(presentation == .collapsed ? 1 : 0)
+                    .allowsHitTesting(presentation == .collapsed)
             }
             .overlay(alignment: .top) {
                 hoverContent.opacity(presentation == .hover ? 1 : 0)
+                    .allowsHitTesting(presentation == .hover)
             }
             .overlay(alignment: .top) {
                 attentionContent.opacity(presentation == .attention ? 1 : 0)
+                    .allowsHitTesting(presentation == .attention)
             }
             .background(shape.fill(Color.black))
             .clipShape(shape)
+            // A click anywhere on the pill goes to the terminal running the session; the Approve and Deny
+            // buttons take their own clicks first.
+            .contentShape(Rectangle())
+            .onTapGesture { model.focusTerminal() }
             .animation(.easeOut(duration: 0.2), value: presentation)
     }
 
@@ -137,8 +144,6 @@ struct PillView: View {
             .frame(height: attentionHeight, alignment: .top)
         }
         .frame(width: NotchGeometry.attentionWidth)
-        .contentShape(Rectangle())
-        .onTapGesture { model.focusTerminal() } // the buttons handle their own clicks
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "Focus terminal") { model.focusTerminal() }
     }

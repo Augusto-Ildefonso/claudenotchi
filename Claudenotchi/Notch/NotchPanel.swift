@@ -16,6 +16,7 @@ final class NotchPanel: NSPanel {
         hasShadow = false
         isMovable = false
         hidesOnDeactivate = false
+        animationBehavior = .none // the pill animates itself; no system fade when it is ordered out
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
     }
 

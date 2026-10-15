@@ -121,28 +121,63 @@ final class NotchWindowController {
         }
     }
 
-    /// Shows the panel while Claude Code is open and takes it off the screen when it is not.
+    private static let appearDuration = 0.5
+    private static let disappearDuration = 0.4
+
+    /// True while the pill is closing back into the notch (it can still be called back by a new session).
+    private var closing = false
+
+    private var presentedFrame: NSRect {
+        geometry.frame(for: shownPresentation, attentionLines: shownLines, attentionButtons: shownButtons)
+    }
+
+    /// Shows the panel while Claude Code is open and takes it off the screen when it is not. The pill widens
+    /// out of the notch on both sides and closes back into it. Where there is no notch to hide behind, the
+    /// same movement is a narrow stub at the top center, with a fade.
     private func applyVisibility(animated: Bool) {
         guard let panel else { return }
         let visible = model.isPillVisible
-        guard visible != panel.isVisible || (visible && panel.alphaValue < 1) else { return }
+        guard visible != panel.isVisible || (visible && closing) else { return }
+        let resting = presentedFrame
+        // On a notch screen the closed pill is hidden by the hardware notch itself; elsewhere it fades.
+        let fades = !geometry.hasNotch
         if visible {
-            panel.alphaValue = animated ? 0 : 1
-            panel.orderFrontRegardless()
-            if animated {
-                NSAnimationContext.runAnimationGroup { $0.duration = 0.25; panel.animator().alphaValue = 1 }
+            closing = false
+            guard animated else {
+                panel.setFrame(resting, display: true)
+                panel.alphaValue = 1
+                panel.orderFrontRegardless()
+                return
+            }
+            if !panel.isVisible {
+                panel.alphaValue = fades ? 0 : 1
+                panel.setFrame(geometry.closedFrame, display: true)
+                panel.orderFrontRegardless()
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Self.appearDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().alphaValue = 1
+                panel.animator().setFrame(resting, display: true)
             }
         } else {
             hover.mouseExited(at: Date())
             model.hoverExpanded = false
             guard animated else { panel.orderOut(nil); return }
+            closing = true
             NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.25
-                panel.animator().alphaValue = 0
+                context.duration = Self.disappearDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().alphaValue = fades ? 0 : 1
+                panel.animator().setFrame(geometry.closedFrame, display: true)
             }, completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
-                    // A session may have started during the fade.
-                    if self?.model.isPillVisible == false { panel.orderOut(nil) } else { panel.alphaValue = 1 }
+                    // A new session during the closing took the pill back; it is already opening again.
+                    guard let self, self.closing else { return }
+                    self.closing = false
+                    panel.orderOut(nil)
+                    panel.alphaValue = 1
+                    panel.setFrame(self.presentedFrame, display: false)
                 }
             })
         }

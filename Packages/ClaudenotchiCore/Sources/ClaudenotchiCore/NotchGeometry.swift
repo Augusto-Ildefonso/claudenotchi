@@ -96,6 +96,16 @@ public struct NotchGeometry: Equatable, Sendable {
         )
     }
 
+    /// The pill with nothing to show: exactly the notch, so the pill appears by widening out of it on both
+    /// sides and disappears by closing back into it. A screen without a notch gets a narrow stub at the
+    /// top center instead.
+    public var closedFrame: CGRect {
+        if hasNotch { return notchRect }
+        let size = Self.fallbackSize
+        let width = size.height
+        return CGRect(x: screenFrame.midX - width / 2, y: screenFrame.maxY - size.height, width: width, height: size.height)
+    }
+
     /// Frame of the hover-expanded panel: centered on the notch, flush with the top, kept on screen.
     public var expandedFrame: CGRect {
         panelFrame(width: Self.expandedWidth, contentHeight: Self.expandedContentHeight)
