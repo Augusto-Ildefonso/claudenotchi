@@ -75,7 +75,7 @@ swift test                  # the logic lives in this package; 300 tests
 - `Claudenotchi/`: the app (notch window, SwiftUI views, menu bar, sprites, sounds)
 - `Packages/ClaudenotchiCore/`: events, state machine, socket server and client, hook installer, geometry, usage and prices, and the `claudenotchi-hook` helper
 - `scripts/fake-session.sh`: walks the app through every state without a real Claude Code session
-- `scripts/gen_sprites.py`, `scripts/gen_sounds.py`: generate the pixel art and sounds from `art/sprites.json`; `scripts/make_preview.py` renders the GIF above
+- `scripts/gen_sprites.py`, `scripts/gen_sounds.py`: generate the pixel art and sounds from `art/sprites.json`; `scripts/make_preview.py` renders the GIF above; the app icon is designed in Figma, master in `art/icon/`
 - `scripts/release.sh`: universal build and DMG; with `SIGN_IDENTITY` and `NOTARY_PROFILE` it also signs (hardened runtime) and notarizes
 - `.claude/plans/mvp-plan.md`: the design plan and a log of what was built and verified
 
