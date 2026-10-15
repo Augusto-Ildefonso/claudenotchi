@@ -35,10 +35,12 @@ public struct SessionEvent: Equatable, Sendable, Codable {
     public var cwd: String?
     public var transcriptPath: String?
     public var timestamp: Date
+    /// True when a failed tool was stopped by the user (Esc), which is not an error to show.
+    public var isInterrupt: Bool
 
     public init(
         sessionID: String, type: EventType, tool: String? = nil, message: String? = nil,
-        cwd: String? = nil, transcriptPath: String? = nil, timestamp: Date
+        cwd: String? = nil, transcriptPath: String? = nil, timestamp: Date, isInterrupt: Bool = false
     ) {
         self.sessionID = sessionID
         self.type = type
@@ -47,6 +49,7 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         self.cwd = cwd
         self.transcriptPath = transcriptPath
         self.timestamp = timestamp
+        self.isInterrupt = isInterrupt
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -54,6 +57,19 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         case type, tool, message, cwd
         case transcriptPath = "transcript_path"
         case timestamp = "ts"
+        case isInterrupt = "interrupt"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sessionID = try c.decode(String.self, forKey: .sessionID)
+        type = try c.decode(EventType.self, forKey: .type)
+        tool = try c.decodeIfPresent(String.self, forKey: .tool)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+        cwd = try c.decodeIfPresent(String.self, forKey: .cwd)
+        transcriptPath = try c.decodeIfPresent(String.self, forKey: .transcriptPath)
+        timestamp = try c.decode(Date.self, forKey: .timestamp)
+        isInterrupt = try c.decodeIfPresent(Bool.self, forKey: .isInterrupt) ?? false
     }
 
     /// Builds an event from the JSON Claude Code writes to a hook's stdin.
@@ -71,7 +87,8 @@ public struct SessionEvent: Equatable, Sendable, Codable {
             message: object["message"] as? String,
             cwd: object["cwd"] as? String,
             transcriptPath: object["transcript_path"] as? String,
-            timestamp: receivedAt
+            timestamp: receivedAt,
+            isInterrupt: object["is_interrupt"] as? Bool ?? false
         )
     }
 

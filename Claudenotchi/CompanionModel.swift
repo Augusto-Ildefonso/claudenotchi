@@ -1,4 +1,5 @@
 import ClaudenotchiCore
+import Foundation
 import Observation
 import OSLog
 
@@ -8,6 +9,11 @@ final class CompanionModel {
     private(set) var state: CompanionState = .waiting
     /// When `state` began; sprite animations restart from here.
     private(set) var stateSince = Date()
+    /// Whether the pill is showing its hover-expanded layout (set by the window controller).
+    var isExpanded = false
+
+    private var lastCwd: String?
+    private var lastMessage: String?
 
     @ObservationIgnored private var machine = StateMachine(now: Date())
     @ObservationIgnored private let server: EventServer
@@ -16,6 +22,13 @@ final class CompanionModel {
 
     init(socketPath: String = SocketPath.default()) {
         server = EventServer(path: socketPath)
+    }
+
+    /// Second line of the expanded pill: what Claude is asking, or the project folder.
+    var detail: String {
+        if state == .needsInput, let message = lastMessage, !message.isEmpty { return message }
+        if let cwd = lastCwd { return PathDisplay.abbreviated(cwd, home: NSHomeDirectory()) }
+        return "No session yet"
     }
 
     func start() {
@@ -27,6 +40,7 @@ final class CompanionModel {
 
         tasks.append(Task { [server] in
             for await event in server.events {
+                remember(event)
                 machine.handle(event)
                 publish()
             }
@@ -46,9 +60,14 @@ final class CompanionModel {
         server.stop()
     }
 
+    private func remember(_ event: SessionEvent) {
+        if let cwd = event.cwd, !cwd.isEmpty { lastCwd = cwd }
+        if event.type == .notification || event.type == .permissionRequest { lastMessage = event.message }
+    }
+
     private func publish() {
         if state != machine.state {
-            log.debug("state -> \(self.machine.state.rawValue)")
+            log.debug("state -> \(self.machine.state.rawValue, privacy: .public)")
             state = machine.state
             stateSince = machine.stateSince
         }

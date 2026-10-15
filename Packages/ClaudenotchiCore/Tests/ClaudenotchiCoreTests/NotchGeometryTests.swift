@@ -1,0 +1,112 @@
+import CoreGraphics
+import Testing
+@testable import ClaudenotchiCore
+
+@Suite struct NotchGeometryTests {
+    /// 14" MacBook Pro built-in display: 1512x982 points, notch 185pt wide and 32pt tall.
+    private func notchScreen(origin: CGPoint = .zero) -> NotchGeometry {
+        NotchGeometry(
+            screenFrame: CGRect(origin: origin, size: CGSize(width: 1512, height: 982)),
+            safeAreaTop: 32, leftAreaWidth: 663.5, rightAreaWidth: 663.5
+        )
+    }
+
+    private func plainScreen(origin: CGPoint = .zero) -> NotchGeometry {
+        NotchGeometry(
+            screenFrame: CGRect(origin: origin, size: CGSize(width: 1920, height: 1080)),
+            safeAreaTop: 0, leftAreaWidth: nil, rightAreaWidth: nil
+        )
+    }
+
+    // MARK: notch detection
+
+    @Test func findsTheNotchFromTheAuxiliaryAreas() {
+        let g = notchScreen()
+        #expect(g.hasNotch)
+        #expect(g.notchRect == CGRect(x: 663.5, y: 950, width: 185, height: 32))
+    }
+
+    @Test func screensWithoutASafeAreaHaveNoNotch() {
+        let g = plainScreen()
+        #expect(g.hasNotch == false)
+        #expect(g.notchRect == .zero)
+    }
+
+    @Test func safeAreaWithoutAuxiliaryAreasIsNotANotch() {
+        let g = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1000, height: 800),
+                              safeAreaTop: 30, leftAreaWidth: nil, rightAreaWidth: nil)
+        #expect(g.hasNotch == false)
+    }
+
+    // MARK: collapsed pill
+
+    @Test func collapsedPillHugsTheNotchWithEqualBlackOnBothSides() {
+        let g = notchScreen()
+        let pill = g.collapsedFrame
+        #expect(pill.minX == g.notchRect.minX - NotchGeometry.pillExtension)
+        #expect(pill.maxX == g.notchRect.maxX + NotchGeometry.pillExtension)
+        #expect(pill.midX == g.notchRect.midX)
+        #expect(pill.height == 32)
+        #expect(pill.maxY == 982) // flush with the top edge
+    }
+
+    @Test func collapsedPillOnASecondaryDisplayUsesGlobalCoordinates() {
+        let g = notchScreen(origin: CGPoint(x: -1512, y: 100))
+        let expectedMidX: CGFloat = -1512 + 756
+        let expectedTop: CGFloat = 100 + 982
+        #expect(g.collapsedFrame.midX == expectedMidX)
+        #expect(g.collapsedFrame.maxY == expectedTop)
+    }
+
+    @Test func fallbackPillIsCenteredAtTheTopOfAPlainScreen() {
+        let pill = plainScreen().collapsedFrame
+        #expect(pill.size == NotchGeometry.fallbackSize)
+        #expect(pill.midX == 960)
+        #expect(pill.maxY == 1080)
+    }
+
+    @Test func cornerRadiusDiffersBetweenNotchAndFallback() {
+        #expect(notchScreen().bottomCornerRadius == 12)
+        #expect(plainScreen().bottomCornerRadius == 16)
+    }
+
+    // MARK: expanded pill
+
+    @Test func expandedPanelIsCenteredOnTheNotchAndFlushWithTheTop() {
+        let g = notchScreen()
+        let panel = g.expandedFrame
+        #expect(panel.width == NotchGeometry.expandedWidth)
+        #expect(panel.midX == g.notchRect.midX)
+        #expect(panel.maxY == 982)
+    }
+
+    @Test func expandedPanelAddsContentHeightBelowTheNotch() {
+        let g = notchScreen()
+        #expect(g.expandedFrame.height == g.notchRect.height + NotchGeometry.expandedContentHeight)
+    }
+
+    @Test func expandedPanelOnAPlainScreenIsCenteredToo() {
+        let g = plainScreen()
+        #expect(g.expandedFrame.midX == 960)
+        #expect(g.expandedFrame.maxY == 1080)
+        #expect(g.expandedFrame.height == NotchGeometry.fallbackSize.height + NotchGeometry.expandedContentHeight)
+    }
+
+    @Test func expandedPanelContainsTheCollapsedPill() {
+        for g in [notchScreen(), plainScreen()] {
+            #expect(g.expandedFrame.contains(g.collapsedFrame))
+        }
+    }
+
+    @Test func expandedPanelNeverExceedsAnArrowScreen() {
+        let narrow = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 300, height: 600),
+                                   safeAreaTop: 0, leftAreaWidth: nil, rightAreaWidth: nil)
+        #expect(narrow.expandedFrame.width <= 300)
+        #expect(narrow.expandedFrame.minX >= 0)
+    }
+
+    @Test func topInsetIsTheHeightOfTheBlackBarAboveTheContent() {
+        #expect(notchScreen().topInset == 32)
+        #expect(plainScreen().topInset == NotchGeometry.fallbackSize.height)
+    }
+}

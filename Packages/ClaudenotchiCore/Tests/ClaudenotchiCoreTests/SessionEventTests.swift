@@ -30,6 +30,15 @@ import Testing
         #expect(e.message == "Claude needs your permission to use Bash")
     }
 
+    @Test func capturesTheInterruptFlagOfAFailedTool() throws {
+        let interrupted = try event(#"{"session_id":"s","hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"x","is_interrupt":true}"#)
+        let failed = try event(#"{"session_id":"s","hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"x","is_interrupt":false}"#)
+        let plain = try event(#"{"session_id":"s","hook_event_name":"Stop"}"#)
+        #expect(interrupted.isInterrupt)
+        #expect(failed.isInterrupt == false)
+        #expect(plain.isInterrupt == false)
+    }
+
     @Test func capturesTranscriptPath() throws {
         let e = try event(#"{"session_id":"abc","hook_event_name":"Stop","transcript_path":"/t/abc.jsonl"}"#)
         #expect(e.transcriptPath == "/t/abc.jsonl")
@@ -76,7 +85,7 @@ import Testing
     @Test func wireLineRoundTrips() throws {
         let original = SessionEvent(
             sessionID: "abc", type: .preToolUse, tool: "Bash", message: nil,
-            cwd: "/tmp/p", transcriptPath: "/t.jsonl", timestamp: now
+            cwd: "/tmp/p", transcriptPath: "/t.jsonl", timestamp: now, isInterrupt: true
         )
         let line = try original.wireLine()
         #expect(line.last == UInt8(ascii: "\n"))

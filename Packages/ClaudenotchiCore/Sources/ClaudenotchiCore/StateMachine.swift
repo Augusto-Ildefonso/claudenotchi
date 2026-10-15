@@ -44,15 +44,19 @@ public struct StateMachine {
         case .stop:
             transition(to: .done, at: now)
         case .sessionEnd:
-            transition(to: .waiting, at: now)
+            // A finished session sends SessionEnd right after Stop; let the celebration run its course.
+            if state != .done { transition(to: .waiting, at: now) }
         case .sessionStart:
             if isIdle || state == .sleeping { transition(to: .waiting, at: now) }
         case .postToolUseFailure:
-            transition(to: .error, at: now)
+            // A tool the user interrupted is not an error worth showing.
+            transition(to: event.isInterrupt ? .thinking : .error, at: now)
         case .postToolUse:
             if !errorIsStillShowing(at: now) { transition(to: .thinking, at: now) }
         case .preToolUse:
-            if state != .needsInput, !errorIsStillShowing(at: now) {
+            // After a denied permission prompt Claude Code sends no PostToolUse, only the next
+            // PreToolUse, so a new tool starting also means the earlier prompt was resolved.
+            if !errorIsStillShowing(at: now) {
                 transition(to: Self.state(forTool: event.tool), at: now)
             }
         case .unknown:

@@ -16,22 +16,35 @@ final class SpriteLibrary {
     /// Used when `manifest.json` is missing or has no entry for a state.
     private static let fallbackFPS = 6.0
 
+    private struct Key: Hashable {
+        let state: CompanionState
+        let size: Int
+    }
+
     private let log = Logger(subsystem: "dev.claudenotchi.Claudenotchi", category: "sprites")
     private lazy var manifest: SpriteManifest? = Self.loadManifest(log: log)
-    private var clips: [CompanionState: SpriteClip] = [:]
+    private var clips: [Key: SpriteClip] = [:]
 
-    func clip(for state: CompanionState) -> SpriteClip? {
-        if let cached = clips[state] { return cached }
-        guard let sheet = SpriteSheet.load(state: state.spriteName, size: 16) else {
-            log.error("Missing sprite strip for \(state.rawValue)")
+    /// - Parameter size: 16 for the collapsed pill, 32 for the expanded view. A state without 32px art
+    ///   falls back to its 16px frames (the caller scales them with nearest-neighbor).
+    func clip(for state: CompanionState, size: Int = 16) -> SpriteClip? {
+        let key = Key(state: state, size: size)
+        if let cached = clips[key] { return cached }
+
+        let entry = manifest?.entry(for: state)
+        let wants32 = size >= 32 && entry?.size32 != nil
+        let stripSize = wants32 ? 32 : 16
+        guard let sheet = SpriteSheet.load(state: state.spriteName, size: stripSize) else {
+            log.error("Missing \(stripSize)px sprite strip for \(state.rawValue)")
             return nil
         }
-        let entry = manifest?.entry(for: state)
-        let count = min(entry?.frames ?? sheet.frameCount, sheet.frameCount)
+        let declared = wants32 ? (entry?.frames32 ?? sheet.frameCount) : (entry?.frames ?? sheet.frameCount)
+        let count = min(declared, sheet.frameCount)
         let frames = (0..<count).compactMap { sheet.frame($0) }
         guard !frames.isEmpty else { return nil }
+
         let clip = SpriteClip(frames: frames, fps: entry?.fps ?? Self.fallbackFPS)
-        clips[state] = clip
+        clips[key] = clip
         return clip
     }
 

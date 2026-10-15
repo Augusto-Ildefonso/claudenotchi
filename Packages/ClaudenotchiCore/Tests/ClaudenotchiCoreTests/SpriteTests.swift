@@ -72,6 +72,13 @@ private func pixelSize(of file: URL) -> (width: Int, height: Int)? {
         }
     }
 
+    @Test func everyStateHasAFull32pxStripForTheExpandedView() throws {
+        for (name, entry) in try repoManifest().states {
+            #expect(entry.size32 != nil, "\(name) has no 32px strip")
+            #expect(entry.frames32 == entry.frames, "\(name) 32px strip should have every frame")
+        }
+    }
+
     @Test func repoIdleListOnlyNamesRealStates() throws {
         let known = Set(CompanionState.allCases.map(\.rawValue))
         for name in try repoManifest().idle {

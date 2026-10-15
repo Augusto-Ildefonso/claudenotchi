@@ -58,11 +58,13 @@ import Testing
 
     // MARK: needsInput priority
 
-    @Test func needsInputIgnoresLowerPriorityToolEvents() {
+    // Real Claude Code: after a denied permission prompt there is no PostToolUse; the next event is a
+    // PreToolUse for the next tool. So a new tool starting means the prompt was resolved.
+    @Test func aNewToolStartingMeansThePermissionPromptWasResolved() {
         var m = machine()
-        m.handle(event(.permissionRequest, at: t0))
+        m.handle(event(.permissionRequest, tool: "Bash", at: t0))
         m.handle(event(.preToolUse, tool: "Edit", at: t0.addingTimeInterval(1)))
-        #expect(m.state == .needsInput)
+        #expect(m.state == .coding)
     }
 
     @Test func needsInputEndsWhenToolFinishes() {
@@ -100,6 +102,13 @@ import Testing
         m.handle(event(.preToolUse, tool: "Bash", at: t0))
         m.handle(event(.postToolUseFailure, tool: "Bash", at: t0.addingTimeInterval(1)))
         #expect(m.state == .error)
+    }
+
+    @Test func aToolInterruptedByTheUserIsNotAnError() {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Bash", at: t0))
+        m.handle(SessionEvent(sessionID: "s1", type: .postToolUseFailure, tool: "Bash", timestamp: t0.addingTimeInterval(1), isInterrupt: true))
+        #expect(m.state == .thinking)
     }
 
     @Test func errorHoldsForThreeSecondsThenThinking() {
@@ -221,6 +230,16 @@ import Testing
         var m = machine()
         m.handle(event(.preToolUse, tool: "Edit", at: t0))
         m.handle(event(.sessionEnd, at: t0.addingTimeInterval(1)))
+        #expect(m.state == .waiting)
+    }
+
+    // Real Claude Code sends SessionEnd right after Stop when a session finishes.
+    @Test func sessionEndDoesNotCutShortTheDoneCelebration() {
+        var m = machine()
+        m.handle(event(.stop, at: t0))
+        m.handle(event(.sessionEnd, at: t0.addingTimeInterval(0.02)))
+        #expect(m.state == .done)
+        m.tick(now: t0.addingTimeInterval(5))
         #expect(m.state == .waiting)
     }
 

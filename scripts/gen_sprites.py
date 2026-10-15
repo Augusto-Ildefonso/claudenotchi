@@ -5,7 +5,7 @@ Source of truth for the mascot art (mirrors the Figma file "Claudenotchi").
 Outputs:
   art/sprites.json                         pixel maps (16px for every state, 32px for key states)
   Claudenotchi/Sprites/<state>@16.png      horizontal strip, 16N x 16, transparent RGBA
-  Claudenotchi/Sprites/<state>@32.png      horizontal strip, 32N x 32 (key states only)
+  Claudenotchi/Sprites/<state>@32.png      horizontal strip, 32N x 32 (every frame, used by the expanded view)
   Claudenotchi/Sprites/manifest.json       state -> frames, fps, files
 
 Run from the repo root:  python3 -I scripts/gen_sprites.py
@@ -225,9 +225,8 @@ def big(m, glint):
     return ["".join(r) for r in up]
 
 
-# state -> (frame indexes used for 32px art, glint)
-KEY32 = {"waiting": ([0, 4], True), "thinking": ([0, 2], True), "alert": ([0, 1], True),
-         "celebrating": ([0, 1], False), "error": ([0, 1], False), "sleeping": ([0, 1], False)}
+# States whose eyes are not plain dark bars (happy ^ ^, X X, closed lines) get no eye glint.
+NO_GLINT = {"celebrating", "error", "sleeping"}
 
 
 def to_strip(maps, size):
@@ -250,13 +249,11 @@ def main():
         entry = {"frames": len(frames), "fps": fps, "size16": f"{name}@16.png", "size32": None}
         to_strip(frames, 16).save(os.path.join(OUT_DIR, f"{name}@16.png"))
         maps_json[name] = {"16": frames}
-        if name in KEY32:
-            idx, glint = KEY32[name]
-            b = [big(frames[i], glint) for i in idx]
-            to_strip(b, 32).save(os.path.join(OUT_DIR, f"{name}@32.png"))
-            entry["size32"] = f"{name}@32.png"
-            entry["frames32"] = len(b)
-            maps_json[name]["32"] = b
+        b = [big(frame, name not in NO_GLINT) for frame in frames]
+        to_strip(b, 32).save(os.path.join(OUT_DIR, f"{name}@32.png"))
+        entry["size32"] = f"{name}@32.png"
+        entry["frames32"] = len(b)
+        maps_json[name]["32"] = b
         manifest["states"][name] = entry
     with open(os.path.join(OUT_DIR, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)

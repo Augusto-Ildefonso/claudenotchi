@@ -5,78 +5,84 @@
       "fps": 6,
       "size16": "waiting@16.png",
       "size32": "waiting@32.png",
-      "frames32": 2
+      "frames32": 8
     },
     "thinking": {
       "frames": 4,
       "fps": 4,
       "size16": "thinking@16.png",
       "size32": "thinking@32.png",
-      "frames32": 2
+      "frames32": 4
     },
     "coding": {
       "frames": 4,
       "fps": 6,
       "size16": "coding@16.png",
-      "size32": null
+      "size32": "coding@32.png",
+      "frames32": 4
     },
     "reading": {
       "frames": 4,
       "fps": 3,
       "size16": "reading@16.png",
-      "size32": null
+      "size32": "reading@32.png",
+      "frames32": 4
     },
     "bash": {
       "frames": 4,
       "fps": 4,
       "size16": "bash@16.png",
-      "size32": null
+      "size32": "bash@32.png",
+      "frames32": 4
     },
     "web": {
       "frames": 4,
       "fps": 6,
       "size16": "web@16.png",
-      "size32": null
+      "size32": "web@32.png",
+      "frames32": 4
     },
     "alert": {
       "frames": 4,
       "fps": 8,
       "size16": "alert@16.png",
       "size32": "alert@32.png",
-      "frames32": 2
+      "frames32": 4
     },
     "celebrating": {
       "frames": 6,
       "fps": 8,
       "size16": "celebrating@16.png",
       "size32": "celebrating@32.png",
-      "frames32": 2
+      "frames32": 6
     },
     "error": {
       "frames": 4,
       "fps": 8,
       "size16": "error@16.png",
       "size32": "error@32.png",
-      "frames32": 2
+      "frames32": 4
     },
     "videogame": {
       "frames": 4,
       "fps": 6,
       "size16": "videogame@16.png",
-      "size32": null
+      "size32": "videogame@32.png",
+      "frames32": 4
     },
     "tennis": {
       "frames": 6,
       "fps": 6,
       "size16": "tennis@16.png",
-      "size32": null
+      "size32": "tennis@32.png",
+      "frames32": 6
     },
     "sleeping": {
       "frames": 4,
       "fps": 2,
       "size16": "sleeping@16.png",
       "size32": "sleeping@32.png",
-      "frames32": 2
+      "frames32": 4
     }
   },
   "idle": [
