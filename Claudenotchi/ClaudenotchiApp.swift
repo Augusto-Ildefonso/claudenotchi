@@ -1,3 +1,4 @@
+import ClaudenotchiCore
 import SwiftUI
 
 @main
@@ -5,10 +6,13 @@ struct ClaudenotchiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage(AppSettings.hoverDelayKey) private var hoverDelay = AppSettings.defaultHoverDelay
     @AppStorage(AppSettings.mascotSizeKey) private var mascotSize = AppSettings.defaultMascotSize
+    @AppStorage(AppSettings.displayPreferenceKey) private var displayPreference = "auto"
     @AppStorage(AppSettings.soundsEnabledKey) private var soundsEnabled = true
+    @State private var displays = DisplayList()
+    @State private var loginItem = LaunchAtLogin()
 
     var body: some Scene {
-        MenuBarExtra("Claudenotchi", systemImage: "pawprint.fill") {
+        MenuBarExtra {
             Picker("Expand on hover", selection: $hoverDelay) {
                 ForEach(AppSettings.hoverDelayOptions, id: \.seconds) { option in
                     Text(option.label).tag(option.seconds)
@@ -19,7 +23,23 @@ struct ClaudenotchiApp: App {
                     Text(option.label).tag(option.points)
                 }
             }
+            Picker("Show on", selection: $displayPreference) {
+                Text("Automatic").tag(DisplayPreference.automatic.storedValue)
+                Text("Main display").tag(DisplayPreference.main.storedValue)
+                Divider()
+                ForEach(displays.screens) { screen in
+                    Text(screen.hasNotch ? "\(screen.name) (notch)" : screen.name)
+                        .tag(DisplayPreference.display(id: screen.id).storedValue)
+                }
+            }
             Toggle("Play sounds", isOn: $soundsEnabled)
+            Toggle("Open at login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.set($0) }))
+            if loginItem.needsApproval {
+                Text("Approve Claudenotchi in System Settings > Login Items")
+            }
+            if let failure = loginItem.failure {
+                Text("Open at login: \(failure)")
+            }
             Divider()
             HookMenuSection(setup: appDelegate.hookSetup)
             Divider()
@@ -27,6 +47,10 @@ struct ClaudenotchiApp: App {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+        } label: {
+            // The mascot as a template image: macOS tints it for light, dark and the selected state.
+            Image("MenuBarIcon")
+                .accessibilityLabel("Claudenotchi")
         }
     }
 }

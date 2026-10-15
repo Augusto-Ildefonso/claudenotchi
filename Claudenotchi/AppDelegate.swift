@@ -6,7 +6,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notchController: NotchWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        model.start()
+        guard model.start() else {
+            NSApplication.shared.terminate(nil) // another copy is running; do not fight it for the socket
+            return
+        }
         hookSetup.start()
         let controller = NotchWindowController(model: model)
         controller.show()

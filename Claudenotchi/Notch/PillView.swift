@@ -38,14 +38,25 @@ struct PillView: View {
 
     // MARK: Collapsed
 
-    /// The mascot centered in the left extension (beside the notch), vertically centered in the
-    /// notch-height bar. Its size is the user's choice; see `AppSettings.mascotSizeOptions`.
+    /// The mascot centered in the small strip left of the notch (the strip is only as wide as the mascot needs),
+    /// vertically centered in the notch-height bar. Its size is the user's choice; see `AppSettings.mascotSizeOptions`.
     private var collapsedContent: some View {
         let size = CGFloat(mascotSize)
-        let leading = geometry.hasNotch ? max(4, (NotchGeometry.pillExtension - size) / 2) : 12
-        return AnimatedSpriteView(state: model.state, since: model.stateSince, size: size)
-            .padding(.leading, leading)
-            .frame(height: geometry.topInset)
+        let leading = geometry.hasNotch ? max(2, (geometry.collapsedStrip - size) / 2) : 12
+        return HStack(spacing: 8) {
+            AnimatedSpriteView(state: model.state, since: model.stateSince, size: size)
+            if !geometry.hasNotch {
+                // No notch to anchor to: the floating pill says what is going on next to the mascot.
+                Text(model.state.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color(white: 0.7))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.leading, leading)
+        .padding(.trailing, 12)
+        .frame(maxWidth: geometry.collapsedFrame.width, alignment: .leading)
+        .frame(height: geometry.topInset)
     }
 
     // MARK: Hover
@@ -65,6 +76,16 @@ struct PillView: View {
                         .foregroundStyle(Color(white: 0.6))
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if let usage = model.usage, let summary = usage.summary {
+                        HStack(spacing: 8) {
+                            Text(summary)
+                                .font(.system(size: 11).monospacedDigit())
+                                .foregroundStyle(Color(white: 0.6))
+                            if let fraction = usage.contextFraction {
+                                ContextBar(fraction: fraction)
+                            }
+                        }
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -146,5 +167,28 @@ private struct PillButtonStyle: ButtonStyle {
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .background(color.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+/// A thin bar showing how full the context is; it warms from green to red as it fills.
+private struct ContextBar: View {
+    let fraction: Double
+
+    private var color: Color {
+        switch fraction {
+        case ..<0.6: Color(red: 0.36, green: 0.76, blue: 0.48)
+        case ..<0.85: Color(red: 0.96, green: 0.77, blue: 0.26)
+        default: Color(red: 0.90, green: 0.28, blue: 0.30)
+        }
+    }
+
+    var body: some View {
+        Capsule()
+            .fill(Color(white: 0.2))
+            .frame(width: 64, height: 4)
+            .overlay(alignment: .leading) {
+                Capsule().fill(color).frame(width: 64 * min(1, max(0, fraction)), height: 4)
+            }
+            .accessibilityHidden(true) // the percentage is already in the text next to it
     }
 }

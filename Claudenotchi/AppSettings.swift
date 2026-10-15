@@ -1,3 +1,4 @@
+import ClaudenotchiCore
 import Foundation
 
 /// User preferences, stored in `UserDefaults`. Read on use, so changes apply immediately.
@@ -26,6 +27,20 @@ enum AppSettings {
         ("Medium", 24),
         ("Large", 32),
     ]
+
+    /// Which display the pill lives on; see `DisplayPreference` (stored as "auto", "main" or "display:<id>").
+    static let displayPreferenceKey = "displayPreference"
+
+    static func displayPreference(_ defaults: UserDefaults = .standard) -> DisplayPreference {
+        DisplayPreference(storedValue: defaults.string(forKey: displayPreferenceKey) ?? "auto")
+    }
+
+    /// Debug: treat every display as notchless, to try the fallback pill (`-forceNotchless YES`).
+    static let forceNotchlessKey = "forceNotchless"
+
+    static func mascotSize(_ defaults: UserDefaults = .standard) -> Double {
+        defaults.object(forKey: mascotSizeKey) == nil ? defaultMascotSize : defaults.double(forKey: mascotSizeKey)
+    }
 
     /// Whether the 8-bit chimes play (needs input, done). On by default.
     static let soundsEnabledKey = "soundsEnabled"

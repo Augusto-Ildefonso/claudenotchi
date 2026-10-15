@@ -14,9 +14,16 @@ final class CompanionModel {
     /// Permission prompts waiting for an answer, oldest first.
     private(set) var prompts = PromptQueue()
 
+    /// What the current session has used so far (context, cost); nil until a transcript has been read.
+    private(set) var usage: UsageSnapshot?
+
     private var lastCwd: String?
     private var lastMessage: String?
     @ObservationIgnored private var lastAncestors: [Int] = []
+    @ObservationIgnored private var transcriptPath: String?
+    @ObservationIgnored private var trackers: [String: UsageTracker] = [:]
+    @ObservationIgnored private var usageRefreshRunning = false
+    @ObservationIgnored private var usageRefreshQueued = false
     @ObservationIgnored private var lastTTY: String?
 
     @ObservationIgnored private var machine: StateMachine
@@ -62,9 +69,15 @@ final class CompanionModel {
 
     // MARK: Lifecycle
 
-    func start() {
+    /// Returns false when another copy of the app already serves the hook socket; this one should quit rather
+    /// than take it over.
+    @discardableResult
+    func start() -> Bool {
         do {
             try server.start()
+        } catch EventServer.Failure.alreadyRunning {
+            log.error("Another Claudenotchi is already running; leaving its socket alone")
+            return false
         } catch {
             log.error("Could not start the event server: \(String(describing: error))")
         }
@@ -92,12 +105,37 @@ final class CompanionModel {
                 publish()
             }
         })
+        return true
     }
 
     func stop() {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
         server.stop()
+    }
+
+    // MARK: Usage
+
+    /// Re-reads what was added to the session's transcript. Off the main thread; calls that arrive while a
+    /// read is running collapse into one more read afterwards.
+    func refreshUsage() {
+        guard let path = transcriptPath else { return }
+        guard !usageRefreshRunning else {
+            usageRefreshQueued = true
+            return
+        }
+        usageRefreshRunning = true
+        let tracker = trackers[path] ?? UsageTracker(path: path)
+        trackers = [path: tracker] // only the current session is worth keeping
+        Task {
+            let snapshot = await Task.detached(priority: .utility) { tracker.refresh() }.value
+            usage = snapshot.messageCount > 0 ? snapshot : nil
+            usageRefreshRunning = false
+            if usageRefreshQueued {
+                usageRefreshQueued = false
+                refreshUsage()
+            }
+        }
     }
 
     // MARK: Answering
@@ -149,6 +187,12 @@ final class CompanionModel {
         machine.handle(event)
         publish()
 
+        // Usage only changes when Claude finishes a step; reading on these events keeps it current.
+        switch event.type {
+        case .sessionStart, .userPromptSubmit, .postToolUse, .stop: refreshUsage()
+        default: break
+        }
+
         // A second prompt while one is already showing gets its own chime.
         if before == .needsInput, state == .needsInput, prompts.count > promptsBefore {
             SoundPlayer.shared.play(.needsInput)
@@ -157,6 +201,10 @@ final class CompanionModel {
 
     private func remember(_ event: SessionEvent) {
         if let cwd = event.cwd, !cwd.isEmpty { lastCwd = cwd }
+        if let path = event.transcriptPath, !path.isEmpty {
+            if path != transcriptPath { usage = nil } // a different session: do not show the old numbers
+            transcriptPath = path
+        }
         if event.type == .notification || event.type == .permissionRequest { lastMessage = event.message }
         if !event.ancestorPIDs.isEmpty {
             lastAncestors = event.ancestorPIDs

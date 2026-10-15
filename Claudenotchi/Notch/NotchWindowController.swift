@@ -8,6 +8,7 @@ final class NotchWindowController {
     private let model: CompanionModel
     private var panel: NotchPanel?
     private var geometry = NotchWindowController.currentGeometry()
+    private var preferenceObserver: DefaultsKeyObserver?
     private var observer: NSObjectProtocol?
 
     private var hover = HoverIntent(expandDelay: AppSettings.hoverDelay())
@@ -34,6 +35,14 @@ final class NotchWindowController {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reposition() }
+        }
+
+        // The "Show on" choice in the menu is a user default; move the pill when it points somewhere else.
+        preferenceObserver = DefaultsKeyObserver(keys: [AppSettings.displayPreferenceKey, AppSettings.forceNotchlessKey, AppSettings.mascotSizeKey]) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, Self.currentGeometry() != self.geometry else { return }
+                self.reposition()
+            }
         }
     }
 
@@ -76,6 +85,7 @@ final class NotchWindowController {
     private func evaluateHover() {
         hover.expandDelay = AppSettings.hoverDelay()
         hover.tick(now: Date())
+        if hover.isExpanded, !model.hoverExpanded { model.refreshUsage() }
         model.hoverExpanded = hover.isExpanded
     }
 
@@ -126,14 +136,13 @@ final class NotchWindowController {
         }
     }
 
-    /// Prefers a screen with a notch; falls back to the main screen.
+    /// The screen the user chose in the menu (a notch screen by default, else the main one). The strip beside the
+    /// notch is only as wide as the chosen mascot needs.
     private static func currentGeometry() -> NotchGeometry {
-        let screen = NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? NSScreen.screens[0]
-        return NotchGeometry(
-            screenFrame: screen.frame,
-            safeAreaTop: screen.safeAreaInsets.top,
-            leftAreaWidth: screen.auxiliaryTopLeftArea?.width,
-            rightAreaWidth: screen.auxiliaryTopRightArea?.width
-        )
+        let screens = ScreenInfo.connected()
+        let strip = NotchGeometry.collapsedExtension(forMascotSize: CGFloat(AppSettings.mascotSize()))
+        let chosen = DisplayChooser.choose(AppSettings.displayPreference(), from: screens)
+        return (chosen ?? screens.first)?.geometry(collapsedExtension: strip)
+            ?? NotchGeometry(screenFrame: .zero, safeAreaTop: 0, leftAreaWidth: nil, rightAreaWidth: nil)
     }
 }

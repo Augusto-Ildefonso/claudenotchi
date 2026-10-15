@@ -6,6 +6,9 @@ import Foundation
 public final class EventServer: @unchecked Sendable {
     public enum Failure: Error, Equatable {
         case pathTooLong
+        /// Another copy of the app is already serving this socket; taking it over would leave that copy listening
+        /// on a socket nobody can reach.
+        case alreadyRunning
         case socket(String, errno: Int32)
     }
 
@@ -48,7 +51,8 @@ public final class EventServer: @unchecked Sendable {
             at: URL(fileURLWithPath: path).deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        unlink(path)
+        guard !UnixSocket.isListening(at: path) else { throw Failure.alreadyRunning }
+        unlink(path) // a stale file from a killed app
 
         let descriptor = UnixSocket.makeStreamSocket()
         guard descriptor >= 0 else { throw Failure.socket("socket", errno: errno) }

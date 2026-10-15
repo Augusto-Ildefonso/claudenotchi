@@ -36,8 +36,58 @@ private func sample(_ type: SessionEvent.EventType = .userPromptSubmit, tool: St
 
 @Suite struct EventTransportTests {
     @Test func defaultSocketPathLivesInApplicationSupport() {
-        let path = SocketPath.default()
+        let path = SocketPath.default(environment: [:])
         #expect(path.hasSuffix("/Library/Application Support/Claudenotchi/sock"))
+    }
+
+    @Test func theSocketPathCanBeOverriddenForTestInstances() {
+        #expect(SocketPath.default(environment: ["CLAUDENOTCHI_SOCKET": "/tmp/test.sock"]) == "/tmp/test.sock")
+    }
+
+    @Test func anEmptyOverrideIsIgnored() {
+        #expect(SocketPath.default(environment: ["CLAUDENOTCHI_SOCKET": ""]).hasSuffix("/Claudenotchi/sock"))
+    }
+
+    // Two copies of the app must not fight over the socket: the newer one used to replace the file, leaving the
+    // older (still running) app listening on a socket nobody can reach.
+    @Test func aSecondServerRefusesToTakeOverALiveSocket() async throws {
+        let path = tempSocketPath()
+        let first = EventServer(path: path)
+        try first.start()
+        defer { first.stop() }
+
+        let second = EventServer(path: path)
+        #expect(throws: EventServer.Failure.alreadyRunning) { try second.start() }
+
+        // the first one is untouched and still receives events
+        try EventClient.send(sample(.stop), to: path)
+        let events = await collect(1, from: first)
+        #expect(events.map(\.type) == [.stop])
+    }
+
+    @Test func refusingDoesNotRemoveTheLiveSocketFile() throws {
+        let path = tempSocketPath()
+        let first = EventServer(path: path)
+        try first.start()
+        defer { first.stop() }
+        _ = try? EventServer(path: path).start()
+        #expect(FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test func aStaleSocketLeftByACrashedAppIsReplaced() async throws {
+        let path = tempSocketPath()
+        // a socket file nobody is listening on, as a killed app leaves behind
+        var address = try #require(UnixSocket.address(for: path))
+        let descriptor = UnixSocket.makeStreamSocket()
+        #expect(UnixSocket.withSockaddr(&address) { bind(descriptor, $0, $1) } == 0)
+        close(descriptor)
+        #expect(FileManager.default.fileExists(atPath: path))
+
+        let server = EventServer(path: path)
+        try server.start()
+        defer { server.stop() }
+        try EventClient.send(sample(.stop), to: path)
+        #expect(await collect(1, from: server).map(\.type) == [.stop])
     }
 
     @Test func serverReceivesAnEventFromAClient() async throws {

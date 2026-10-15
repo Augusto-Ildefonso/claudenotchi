@@ -4,10 +4,10 @@ import Testing
 
 @Suite struct NotchGeometryTests {
     /// 14" MacBook Pro built-in display: 1512x982 points, notch 185pt wide and 32pt tall.
-    private func notchScreen(origin: CGPoint = .zero) -> NotchGeometry {
+    private func notchScreen(origin: CGPoint = .zero, extension strip: CGFloat = NotchGeometry.pillExtension) -> NotchGeometry {
         NotchGeometry(
             screenFrame: CGRect(origin: origin, size: CGSize(width: 1512, height: 982)),
-            safeAreaTop: 32, leftAreaWidth: 663.5, rightAreaWidth: 663.5
+            safeAreaTop: 32, leftAreaWidth: 663.5, rightAreaWidth: 663.5, collapsedExtension: strip
         )
     }
 
@@ -48,6 +48,50 @@ import Testing
         #expect(pill.midX == g.notchRect.midX)
         #expect(pill.height == 32)
         #expect(pill.maxY == 982) // flush with the top edge
+    }
+
+    // MARK: the strip beside the notch is only as wide as the mascot needs
+
+    @Test func theStripFitsTheMascotWithAMarginOnEachSide() {
+        #expect(NotchGeometry.collapsedExtension(forMascotSize: 16) == 28)
+        #expect(NotchGeometry.collapsedExtension(forMascotSize: 24) == 36)
+        #expect(NotchGeometry.collapsedExtension(forMascotSize: 32) == 44)
+    }
+
+    @Test func aBiggerMascotNeedsAWiderStrip() {
+        #expect(NotchGeometry.collapsedExtension(forMascotSize: 32) > NotchGeometry.collapsedExtension(forMascotSize: 24))
+    }
+
+    @Test func theStripIsMuchNarrowerThanTheOldFixedOne() {
+        #expect(NotchGeometry.collapsedExtension(forMascotSize: 24) < NotchGeometry.pillExtension)
+    }
+
+    @Test func theCollapsedPillUsesTheGivenStripOnBothSides() {
+        let g = notchScreen(extension: 36)
+        let pill = g.collapsedFrame
+        #expect(pill.minX == g.notchRect.minX - 36)
+        #expect(pill.maxX == g.notchRect.maxX + 36)
+        #expect(pill.midX == g.notchRect.midX, "still symmetric around the notch")
+        #expect(pill.width == g.notchRect.width + 72)
+    }
+
+    @Test func aNarrowerStripCoversLessOfTheMenuBar() {
+        #expect(notchScreen(extension: 36).collapsedFrame.width < notchScreen(extension: 56).collapsedFrame.width)
+    }
+
+    @Test func theDefaultStripIsUnchanged() {
+        #expect(notchScreen().collapsedFrame == notchScreen(extension: NotchGeometry.pillExtension).collapsedFrame)
+    }
+
+    @Test func theStripSizeDoesNotChangeTheHoverOrAttentionPanels() {
+        #expect(notchScreen(extension: 36).expandedFrame == notchScreen(extension: 56).expandedFrame)
+        #expect(notchScreen(extension: 36).attentionFrame() == notchScreen(extension: 56).attentionFrame())
+    }
+
+    @Test func aNotchlessScreenIgnoresTheStrip() {
+        let g = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1920, height: 1080), safeAreaTop: 0,
+                              leftAreaWidth: nil, rightAreaWidth: nil, collapsedExtension: 36)
+        #expect(g.collapsedFrame.size == NotchGeometry.fallbackSize)
     }
 
     @Test func collapsedPillOnASecondaryDisplayUsesGlobalCoordinates() {

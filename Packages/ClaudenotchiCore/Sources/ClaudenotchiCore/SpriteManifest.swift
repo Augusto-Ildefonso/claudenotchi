@@ -30,16 +30,3 @@ public struct SpriteManifest: Codable, Equatable, Sendable {
         states[state.spriteName]
     }
 }
-
-/// Frame timing for looping sprite animations.
-public enum SpriteAnimation {
-    /// Which frame to show `elapsed` seconds after the animation started.
-    public static func frameIndex(elapsed: TimeInterval, frames: Int, fps: Double) -> Int {
-        guard frames > 1, fps > 0, elapsed > 0 else { return 0 }
-        return Int(elapsed * fps) % frames
-    }
-
-    public static func frameDuration(fps: Double) -> TimeInterval {
-        fps > 0 ? 1 / fps : 1
-    }
-}

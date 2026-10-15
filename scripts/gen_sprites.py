@@ -7,6 +7,7 @@ Outputs:
   Claudenotchi/Sprites/<state>@16.png      horizontal strip, 16N x 16, transparent RGBA
   Claudenotchi/Sprites/<state>@32.png      horizontal strip, 32N x 32 (every frame, used by the expanded view)
   Claudenotchi/Sprites/manifest.json       state -> frames, fps, files
+  Claudenotchi/Assets.xcassets/MenuBarIcon.imageset  menu bar template icon (mascot silhouette)
 
 Run from the repo root:  python3 -I scripts/gen_sprites.py
 """
@@ -272,6 +273,24 @@ def to_strip(maps, size):
     return img
 
 
+def menu_bar_icon(scale):
+    """The mascot as a one-color template image for the menu bar: opaque body, eyes cut out, the shaded row
+    softer. macOS tints a template image itself (light, dark, selected), so only the alpha matters."""
+    base = S["waiting"][1][0]
+    img = Image.new("RGBA", (16 * scale, 16 * scale), (0, 0, 0, 0))
+    px = img.load()
+    alpha = {"O": 255, "D": 150}  # K (eyes) and "." stay transparent
+    for y, row in enumerate(base):
+        for x, ch in enumerate(row):
+            a = alpha.get(ch)
+            if a is None:
+                continue
+            for dy in range(scale):
+                for dx in range(scale):
+                    px[x * scale + dx, y * scale + dy] = (0, 0, 0, a)
+    return img
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(ART_DIR, exist_ok=True)
@@ -287,6 +306,22 @@ def main():
         entry["frames32"] = len(b)
         maps_json[name]["32"] = b
         manifest["states"][name] = entry
+    icon_dir = os.path.join(ROOT, "Claudenotchi", "Assets.xcassets", "MenuBarIcon.imageset")
+    os.makedirs(icon_dir, exist_ok=True)
+    menu_bar_icon(1).save(os.path.join(icon_dir, "menubar@1x.png"))
+    menu_bar_icon(2).save(os.path.join(icon_dir, "menubar@2x.png"))
+    menu_bar_icon(3).save(os.path.join(icon_dir, "menubar@3x.png"))
+    with open(os.path.join(icon_dir, "Contents.json"), "w") as f:
+        json.dump({
+            "images": [
+                {"idiom": "universal", "filename": "menubar@1x.png", "scale": "1x"},
+                {"idiom": "universal", "filename": "menubar@2x.png", "scale": "2x"},
+                {"idiom": "universal", "filename": "menubar@3x.png", "scale": "3x"},
+            ],
+            "info": {"author": "xcode", "version": 1},
+            "properties": {"template-rendering-intent": "template"},
+        }, f, indent=2)
+        f.write("\n")
     with open(os.path.join(OUT_DIR, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")

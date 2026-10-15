@@ -14,7 +14,7 @@ struct SpriteView: View {
     }
 }
 
-/// Plays a state's looping animation, starting from `since` so it restarts on every state change.
+/// Plays a state's looping animation, starting afresh whenever the state changes (`since` changes).
 struct AnimatedSpriteView: View {
     let state: CompanionState
     let since: Date
@@ -29,15 +29,9 @@ struct AnimatedSpriteView: View {
             if reduceMotion || clip.frames.count == 1 {
                 SpriteView(image: clip.frames[0], size: size)
             } else {
-                TimelineView(.periodic(from: since, by: SpriteAnimation.frameDuration(fps: clip.fps))) { context in
-                    let index = SpriteAnimation.frameIndex(
-                        elapsed: context.date.timeIntervalSince(since),
-                        frames: clip.frames.count,
-                        fps: clip.fps
-                    )
-                    SpriteView(image: clip.frames[index], size: size)
-                }
-                .id(since)
+                LayerSpriteView(frames: clip.frames, fps: clip.fps)
+                    .frame(width: size, height: size)
+                    .id(since) // a new state gets a new layer, so its animation starts from the first frame
             }
         }
     }

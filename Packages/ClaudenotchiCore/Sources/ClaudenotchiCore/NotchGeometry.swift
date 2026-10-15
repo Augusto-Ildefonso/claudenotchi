@@ -15,6 +15,12 @@ public struct NotchGeometry: Equatable, Sendable {
     /// How far the collapsed pill extends past each side of the notch, so the pill stays symmetric
     /// around the notch. The left side holds the mascot; the right side is reserved for status.
     public static let pillExtension: CGFloat = 56
+
+    /// The strip beside the notch that fits a mascot of `size` points with a small margin on each side. The strip
+    /// draws over the menu bar, so it is kept as narrow as the mascot allows.
+    public static func collapsedExtension(forMascotSize size: CGFloat) -> CGFloat {
+        size + 12
+    }
     /// Size of the floating pill on screens without a notch.
     public static let fallbackSize = CGSize(width: 190, height: 32)
     /// Width of the hover-expanded panel.
@@ -32,6 +38,9 @@ public struct NotchGeometry: Equatable, Sendable {
     /// approve (a question or a plan, which only the terminal can answer).
     public static let attentionButtonRowHeight: CGFloat = 17
 
+    /// How far the collapsed pill reaches past each side of the notch (equal, so it stays symmetric).
+    public let collapsedStrip: CGFloat
+
     public let hasNotch: Bool
     /// Notch rectangle in global screen coordinates (origin bottom-left). Zero-sized when `hasNotch` is false.
     public let notchRect: CGRect
@@ -43,8 +52,12 @@ public struct NotchGeometry: Equatable, Sendable {
     ///   - leftAreaWidth / rightAreaWidth: widths of `auxiliaryTopLeftArea` / `auxiliaryTopRightArea`
     ///     (nil when the screen has no notch). Only widths are used, so the result does not depend on
     ///     whether those rects are in local or global coordinates.
-    public init(screenFrame: CGRect, safeAreaTop: CGFloat, leftAreaWidth: CGFloat?, rightAreaWidth: CGFloat?) {
+    public init(
+        screenFrame: CGRect, safeAreaTop: CGFloat, leftAreaWidth: CGFloat?, rightAreaWidth: CGFloat?,
+        collapsedExtension: CGFloat = NotchGeometry.pillExtension
+    ) {
         self.screenFrame = screenFrame
+        self.collapsedStrip = collapsedExtension
         if safeAreaTop > 0, let left = leftAreaWidth, let right = rightAreaWidth {
             hasNotch = true
             notchRect = CGRect(
@@ -68,9 +81,9 @@ public struct NotchGeometry: Equatable, Sendable {
     public var collapsedFrame: CGRect {
         if hasNotch {
             return CGRect(
-                x: notchRect.minX - Self.pillExtension,
+                x: notchRect.minX - collapsedStrip,
                 y: notchRect.minY,
-                width: notchRect.width + 2 * Self.pillExtension,
+                width: notchRect.width + 2 * collapsedStrip,
                 height: notchRect.height
             )
         }

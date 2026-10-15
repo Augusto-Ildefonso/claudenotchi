@@ -3,8 +3,11 @@ import Foundation
 
 /// Where the app listens and the hook helper connects.
 public enum SocketPath {
-    public static func `default`() -> String {
-        FileManager.default.homeDirectoryForCurrentUser
+    /// `~/Library/Application Support/Claudenotchi/sock`, or whatever `CLAUDENOTCHI_SOCKET` names. The override
+    /// lets a test instance of the app use its own socket instead of taking over the real one.
+    public static func `default`(environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
+        if let override = environment["CLAUDENOTCHI_SOCKET"], !override.isEmpty { return override }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Claudenotchi/sock")
             .path
     }
@@ -30,6 +33,16 @@ enum UnixSocket {
         withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { body($0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
         }
+    }
+
+    /// Whether something is accepting connections on the socket at `path`. A file left behind by a killed app
+    /// refuses connections, so it counts as not listening.
+    static func isListening(at path: String) -> Bool {
+        guard var address = address(for: path) else { return false }
+        let descriptor = makeStreamSocket()
+        guard descriptor >= 0 else { return false }
+        defer { close(descriptor) }
+        return withSockaddr(&address) { connect(descriptor, $0, $1) } == 0
     }
 
     static func makeStreamSocket() -> Int32 {
