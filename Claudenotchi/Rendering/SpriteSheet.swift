@@ -1,5 +1,6 @@
-import AppKit
-import SwiftUI
+import CoreGraphics
+import Foundation
+import ImageIO
 
 /// A horizontal strip of square frames, as produced by `scripts/gen_sprites.py`.
 struct SpriteSheet {
@@ -22,18 +23,5 @@ struct SpriteSheet {
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else { return nil }
         return SpriteSheet(image: image, frameSize: size)
-    }
-}
-
-/// Draws one sprite frame with nearest-neighbor scaling (no smoothing).
-struct SpriteView: View {
-    let image: CGImage
-    let size: CGFloat
-
-    var body: some View {
-        Image(decorative: image, scale: 1)
-            .interpolation(.none)
-            .resizable()
-            .frame(width: size, height: size)
     }
 }

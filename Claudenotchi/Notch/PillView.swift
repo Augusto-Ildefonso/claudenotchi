@@ -14,10 +14,8 @@ struct PillView: View {
             )
             .fill(Color.black)
 
-            if let frame = SpriteLibrary.shared.sheet(for: model.state)?.frame(0) {
-                SpriteView(image: frame, size: 16)
-                    .padding(.leading, geometry.hasNotch ? 16 : 12)
-            }
+            AnimatedSpriteView(state: model.state, since: model.stateSince, size: 16)
+                .padding(.leading, geometry.hasNotch ? 16 : 12)
         }
     }
 }

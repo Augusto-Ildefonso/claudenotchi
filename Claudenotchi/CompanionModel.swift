@@ -6,6 +6,8 @@ import OSLog
 @Observable
 final class CompanionModel {
     private(set) var state: CompanionState = .waiting
+    /// When `state` began; sprite animations restart from here.
+    private(set) var stateSince = Date()
 
     @ObservationIgnored private var machine = StateMachine(now: Date())
     @ObservationIgnored private let server: EventServer
@@ -48,6 +50,7 @@ final class CompanionModel {
         if state != machine.state {
             log.debug("state -> \(self.machine.state.rawValue)")
             state = machine.state
+            stateSince = machine.stateSince
         }
     }
 }

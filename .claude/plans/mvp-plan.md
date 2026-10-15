@@ -105,4 +105,12 @@ Phase 2 / Milestone 2 (socket + HookHelper + state machine with unit tests, driv
 - [ ] Not covered live: idle rotation (30-90s) and sleep (5 min) are only unit tested; the permission flow is one-way for now (blocking Approve/Deny is Milestone 5)
 - [ ] Hooks are not registered in `~/.claude/settings.json` yet and the helper is not bundled into the app (Milestone 4)
 
-Milestones 3-8: not started.
+Phase 2 / Milestone 3 (sprite renderer wired to the exported assets for all states), 2026-10-15:
+- [x] `SpriteManifest` (state -> frames, fps, files) and `SpriteAnimation` (frame timing) in the core package; 15 new tests (71 total), including cross-checks that every `CompanionState` has a manifest entry and that each PNG strip's pixel size matches the manifest (verified by deliberately breaking the manifest: the check fails)
+- [x] App: `SpriteLibrary` loads clips from the bundle manifest (frames pre-cropped, fps from the manifest), `AnimatedSpriteView` plays them with a `TimelineView` at the state's frame rate, restarting from `stateSince` on every state change; honors Reduce Motion (shows frame 0); `PillView` uses it
+- [x] Verified live by burst-capturing the pill while driving states through the real helper: waiting (walk cycle with blink), thinking (dots 1-3), coding (typing), needsInput (alert flash), done (jump + confetti) all animate; about 3% CPU and 16 MB in a Debug build while animating
+- [ ] Not exercised live: bash, web, reading, error, videogame, tennis and sleeping animations (assets and manifest are covered by tests; they use the same code path)
+- [ ] The 32px art is shipped but not used yet (first used by the expanded view in Milestone 5)
+- [ ] Possible later optimization: drop to a lower redraw rate while sleeping; the Figma States-page note that the idle list is "data-driven" is only partly true (idle names live in `manifest.json`, but `IdleScheduler` still has the three activities hard-coded)
+
+Milestones 4-8: not started.
