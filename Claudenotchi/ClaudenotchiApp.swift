@@ -8,6 +8,7 @@ struct ClaudenotchiApp: App {
     @AppStorage(AppSettings.mascotSizeKey) private var mascotSize = AppSettings.defaultMascotSize
     @AppStorage(AppSettings.displayPreferenceKey) private var displayPreference = "auto"
     @AppStorage(AppSettings.soundsEnabledKey) private var soundsEnabled = true
+    @AppStorage(AppSettings.hideWhenClosedKey) private var hideWhenClosed = true
     @State private var displays = DisplayList()
     @State private var loginItem = LaunchAtLogin()
 
@@ -32,6 +33,7 @@ struct ClaudenotchiApp: App {
                         .tag(DisplayPreference.display(id: screen.id).storedValue)
                 }
             }
+            Toggle("Hide when Claude isn't running", isOn: $hideWhenClosed)
             Toggle("Play sounds", isOn: $soundsEnabled)
             Toggle("Open at login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.set($0) }))
             if loginItem.needsApproval {

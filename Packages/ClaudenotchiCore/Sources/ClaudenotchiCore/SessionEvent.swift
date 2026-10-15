@@ -45,11 +45,14 @@ public struct SessionEvent: Equatable, Sendable, Codable {
     public var ancestorPIDs: [Int]
     /// Controlling terminal of the session, e.g. `ttys003`.
     public var tty: String?
+    /// For notifications: why Claude Code sent it (`permission_prompt`, `idle_prompt`, `elicitation_dialog`, ...).
+    public var notificationType: String?
 
     public init(
         sessionID: String, type: EventType, tool: String? = nil, message: String? = nil,
         cwd: String? = nil, transcriptPath: String? = nil, timestamp: Date, isInterrupt: Bool = false,
-        expectsReply: Bool = false, requestID: String? = nil, ancestorPIDs: [Int] = [], tty: String? = nil
+        expectsReply: Bool = false, requestID: String? = nil, ancestorPIDs: [Int] = [], tty: String? = nil,
+        notificationType: String? = nil
     ) {
         self.sessionID = sessionID
         self.type = type
@@ -63,6 +66,7 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         self.requestID = requestID
         self.ancestorPIDs = ancestorPIDs
         self.tty = tty
+        self.notificationType = notificationType
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -75,6 +79,7 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         case requestID = "request_id"
         case ancestorPIDs = "ancestors"
         case tty
+        case notificationType = "ntype"
     }
 
     public init(from decoder: Decoder) throws {
@@ -91,6 +96,7 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         requestID = try c.decodeIfPresent(String.self, forKey: .requestID)
         ancestorPIDs = try c.decodeIfPresent([Int].self, forKey: .ancestorPIDs) ?? []
         tty = try c.decodeIfPresent(String.self, forKey: .tty)
+        notificationType = try c.decodeIfPresent(String.self, forKey: .notificationType)
     }
 
     /// Builds an event from the JSON Claude Code writes to a hook's stdin.
@@ -120,7 +126,8 @@ public struct SessionEvent: Equatable, Sendable, Codable {
             isInterrupt: object["is_interrupt"] as? Bool ?? false,
             // Every permission request holds its connection open. Ones the notch cannot answer (see
             // ToolSummary.needsTerminal) are only watched: Claude Code kills the hook when the dialog is cancelled.
-            expectsReply: type == .permissionRequest
+            expectsReply: type == .permissionRequest,
+            notificationType: object["notification_type"] as? String
         )
     }
 

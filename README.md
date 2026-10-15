@@ -8,6 +8,7 @@ A tiny pixel mascot that lives in your MacBook's notch and shows what [Claude Co
 - **Reacts to real events.** It uses Claude Code's official [hooks](https://docs.claude.com/en/docs/claude-code/hooks), not screen scraping.
 - **Permission prompts in the notch.** Approve or Deny a tool call from the notch; questions and plan approvals that need typing are flagged and left for the terminal.
 - **Usage at a glance.** Hover to see the current task, the context window used (`context 83%`) and the estimated session cost.
+- **Only there when needed.** The mascot appears when Claude Code starts and goes away when the last session ends (or its process dies); an option in the menu keeps it always visible.
 - **Several sessions.** Every Claude Code session is tracked; the most urgent one drives the mascot.
 - **Works without a notch.** On other displays it becomes a small pill at the top center.
 
@@ -53,6 +54,7 @@ Nothing leaves your Mac. The app has no network code. It reads the session trans
 | Expand on hover | Delay before the panel opens: off, instantly, 0.25 to 3 s |
 | Mascot size | Small 16 pt, Medium 24 pt (default), Large 32 pt |
 | Show on | Automatic (the notched display), the main display, or a specific display |
+| Hide when Claude isn't running | On by default: the pill is only shown while a Claude Code session is open |
 | Play sounds | Soft sound cues for permission requests, completion and errors |
 | Open at login | Starts the app when you log in |
 | Install / Uninstall Claude Code hooks | Manages the entries in `~/.claude/settings.json` |

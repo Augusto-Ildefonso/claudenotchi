@@ -83,7 +83,8 @@ import Testing
 
     @Test func needsInputEndsWhenUserSubmitsNewPrompt() {
         var m = machine()
-        m.handle(event(.notification, at: t0))
+        m.handle(event(.preToolUse, tool: "Bash", at: t0))
+        m.handle(event(.notification, notificationType: "permission_prompt", at: t0))
         m.handle(event(.userPromptSubmit, at: t0.addingTimeInterval(5)))
         #expect(m.state == .thinking)
     }
@@ -289,5 +290,86 @@ import Testing
         #expect(CompanionState.done.spriteName == "celebrating")
         #expect(CompanionState.coding.spriteName == "coding")
         #expect(CompanionState.videogame.spriteName == "videogame")
+    }
+
+    // MARK: notifications that are not requests (real Claude Code sends idle_prompt 60 s after it finishes)
+
+    @Test func theIdleReminderAfterFinishingDoesNotAskForInput() {
+        var m = machine()
+        m.handle(event(.userPromptSubmit, at: t0))
+        m.handle(event(.stop, at: t0.addingTimeInterval(2)))
+        m.tick(now: t0.addingTimeInterval(8)) // celebration over
+        #expect(m.state == .waiting)
+        m.handle(event(.notification, notificationType: "idle_prompt", at: t0.addingTimeInterval(62)))
+        #expect(m.state == .waiting)
+    }
+
+    @Test func theIdleReminderDoesNotCutTheCelebrationShort() {
+        var m = machine()
+        m.handle(event(.stop, at: t0))
+        m.handle(event(.notification, notificationType: "idle_prompt", at: t0.addingTimeInterval(1)))
+        #expect(m.state == .done)
+    }
+
+    @Test func theIdleReminderDoesNotKeepTheMascotAwake() {
+        var m = machine()
+        m.handle(event(.notification, notificationType: "idle_prompt", at: t0.addingTimeInterval(StateMachine.sleepAfter - 1)))
+        m.tick(now: t0.addingTimeInterval(StateMachine.sleepAfter + 1))
+        #expect(m.state == .sleeping)
+    }
+
+    @Test func theIdleReminderDoesNotWakeASleepingMascot() {
+        var m = machine()
+        m.tick(now: t0.addingTimeInterval(StateMachine.sleepAfter + 1))
+        m.handle(event(.notification, notificationType: "idle_prompt", at: t0.addingTimeInterval(StateMachine.sleepAfter + 5)))
+        #expect(m.state == .sleeping)
+    }
+
+    @Test func otherInformationalNotificationsAreIgnored() {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Bash", at: t0))
+        m.handle(event(.notification, notificationType: "auth_success", at: t0.addingTimeInterval(1)))
+        #expect(m.state == .bash)
+    }
+
+    @Test(arguments: ["permission_prompt", "elicitation_dialog"])
+    func requestsDuringAWorkingTurnNeedInput(type: String) {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Bash", at: t0))
+        m.handle(event(.notification, notificationType: type, at: t0.addingTimeInterval(1)))
+        #expect(m.state == .needsInput)
+    }
+
+    @Test func aNotificationWithoutATypeStillCountsDuringAWorkingTurn() {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Bash", at: t0))
+        m.handle(event(.notification, at: t0.addingTimeInterval(1)))
+        #expect(m.state == .needsInput)
+    }
+
+    // Claude Code sends the permission notification about 6 s after the dialog opened; if the work already
+    // finished by then it is stale and must not replace the celebration.
+    @Test func aLatePermissionNotificationAfterTheTurnEndedIsStale() {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Bash", at: t0))
+        m.handle(event(.postToolUse, tool: "Bash", at: t0.addingTimeInterval(1)))
+        m.handle(event(.stop, at: t0.addingTimeInterval(2)))
+        m.handle(event(.notification, notificationType: "permission_prompt", at: t0.addingTimeInterval(3)))
+        #expect(m.state == .done)
+        m.tick(now: t0.addingTimeInterval(8))
+        m.handle(event(.notification, notificationType: "permission_prompt", at: t0.addingTimeInterval(9)))
+        #expect(m.state == .waiting)
+    }
+
+    @Test func aPermissionNotificationWithNoTurnRunningIsStale() {
+        var m = machine()
+        m.handle(event(.notification, notificationType: "permission_prompt", at: t0))
+        #expect(m.state == .waiting)
+    }
+
+    @Test func aRealPermissionRequestAlwaysNeedsInput() {
+        var m = machine()
+        m.handle(event(.permissionRequest, tool: "Bash", at: t0))
+        #expect(m.state == .needsInput)
     }
 }

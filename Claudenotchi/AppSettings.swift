@@ -42,6 +42,13 @@ enum AppSettings {
         defaults.object(forKey: mascotSizeKey) == nil ? defaultMascotSize : defaults.double(forKey: mascotSizeKey)
     }
 
+    /// Whether the pill is hidden while no Claude Code session is open. On by default.
+    static let hideWhenClosedKey = "hideWhenClosed"
+
+    static func hideWhenClosed(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: hideWhenClosedKey) == nil ? true : defaults.bool(forKey: hideWhenClosedKey)
+    }
+
     /// Whether the 8-bit chimes play (needs input, done). On by default.
     static let soundsEnabledKey = "soundsEnabled"
 

@@ -14,6 +14,9 @@ final class CompanionModel {
     /// Permission prompts waiting for an answer, oldest first.
     private(set) var prompts = PromptQueue()
 
+    /// True while at least one Claude Code session is open (see `SessionRegistry`).
+    private(set) var sessionsOpen = false
+
     /// What the current session has used so far (context, cost); nil until a transcript has been read.
     private(set) var usage: UsageSnapshot?
 
@@ -26,6 +29,8 @@ final class CompanionModel {
     @ObservationIgnored private var usageRefreshQueued = false
     @ObservationIgnored private var lastTTY: String?
 
+    @ObservationIgnored private var registry = SessionRegistry()
+    @ObservationIgnored private var lastPrune = Date()
     @ObservationIgnored private var machine: StateMachine
     @ObservationIgnored private let server: EventServer
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
@@ -42,6 +47,11 @@ final class CompanionModel {
     var presentation: PillPresentation {
         if state == .needsInput { return .attention }
         return hoverExpanded ? .hover : .collapsed
+    }
+
+    /// Whether the pill is on screen at all: only while Claude Code is open, unless the user turned that off.
+    var isPillVisible: Bool {
+        PillVisibility.isVisible(hideWhenClosed: AppSettings.hideWhenClosed(), sessionsOpen: sessionsOpen, state: state)
     }
 
     var currentPrompt: PendingPrompt? { prompts.current }
@@ -101,7 +111,14 @@ final class CompanionModel {
         tasks.append(Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
-                machine.tick(now: Date())
+                let now = Date()
+                machine.tick(now: now)
+                if now.timeIntervalSince(lastPrune) >= 2 {
+                    lastPrune = now
+                    // Closing the terminal or killing Claude sends no SessionEnd; its process being gone says it.
+                    registry.prune(now: now) { ProcessAncestry.isRunning($0) }
+                    updateSessionsOpen()
+                }
                 publish()
             }
         })
@@ -183,6 +200,8 @@ final class CompanionModel {
         let promptsBefore = prompts.count
         if let prompt = PendingPrompt(event: event) { prompts.add(prompt) }
         remember(event)
+        registry.handle(event, claudePID: ProcessAncestry.claudePID(in: event.ancestorPIDs))
+        updateSessionsOpen()
 
         machine.handle(event)
         publish()
@@ -199,13 +218,24 @@ final class CompanionModel {
         }
     }
 
+    private func updateSessionsOpen() {
+        let open = !registry.isEmpty
+        if open != sessionsOpen {
+            sessionsOpen = open
+            log.info("sessions open: \(self.registry.count, privacy: .public)")
+        }
+    }
+
     private func remember(_ event: SessionEvent) {
         if let cwd = event.cwd, !cwd.isEmpty { lastCwd = cwd }
         if let path = event.transcriptPath, !path.isEmpty {
             if path != transcriptPath { usage = nil } // a different session: do not show the old numbers
             transcriptPath = path
         }
-        if event.type == .notification || event.type == .permissionRequest { lastMessage = event.message }
+        // Only real requests; "Claude is waiting for your input" (idle_prompt) is a reminder, not something to show.
+        let isRequest = event.type == .permissionRequest
+            || (event.type == .notification && [nil, "permission_prompt", "elicitation_dialog"].contains(event.notificationType))
+        if isRequest { lastMessage = event.message }
         if !event.ancestorPIDs.isEmpty {
             lastAncestors = event.ancestorPIDs
             lastTTY = event.tty

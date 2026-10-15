@@ -30,6 +30,18 @@ import Testing
         #expect(e.message == "Claude needs your permission to use Bash")
     }
 
+    @Test func capturesTheNotificationType() throws {
+        let idle = try event(#"{"session_id":"abc","hook_event_name":"Notification","notification_type":"idle_prompt","message":"Claude is waiting for your input"}"#)
+        #expect(idle.notificationType == "idle_prompt")
+        let none = try event(#"{"session_id":"abc","hook_event_name":"Notification","message":"x"}"#)
+        #expect(none.notificationType == nil)
+    }
+
+    @Test func theNotificationTypeSurvivesTheWire() throws {
+        let sent = SessionEvent(sessionID: "s", type: .notification, timestamp: now, notificationType: "idle_prompt")
+        #expect(try SessionEvent(wireLine: sent.wireLine()).notificationType == "idle_prompt")
+    }
+
     @Test func capturesTheInterruptFlagOfAFailedTool() throws {
         let interrupted = try event(#"{"session_id":"s","hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"x","is_interrupt":true}"#)
         let failed = try event(#"{"session_id":"s","hook_event_name":"PostToolUseFailure","tool_name":"Bash","error":"x","is_interrupt":false}"#)

@@ -25,8 +25,8 @@ final class NotchWindowController {
         geometry = Self.currentGeometry()
         let panel = NotchPanel(contentRect: geometry.collapsedFrame)
         panel.contentView = makeContentView()
-        panel.orderFrontRegardless()
         self.panel = panel
+        applyVisibility(animated: false)
         observePresentation()
 
         observer = NotificationCenter.default.addObserver(
@@ -38,10 +38,11 @@ final class NotchWindowController {
         }
 
         // The "Show on" choice in the menu is a user default; move the pill when it points somewhere else.
-        preferenceObserver = DefaultsKeyObserver(keys: [AppSettings.displayPreferenceKey, AppSettings.forceNotchlessKey, AppSettings.mascotSizeKey]) { [weak self] in
+        preferenceObserver = DefaultsKeyObserver(keys: [AppSettings.displayPreferenceKey, AppSettings.forceNotchlessKey, AppSettings.mascotSizeKey, AppSettings.hideWhenClosedKey]) { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, Self.currentGeometry() != self.geometry else { return }
-                self.reposition()
+                guard let self else { return }
+                self.applyVisibility(animated: true)
+                if Self.currentGeometry() != self.geometry { self.reposition() }
             }
         }
     }
@@ -106,15 +107,44 @@ final class NotchWindowController {
     private func observePresentation() {
         withObservationTracking {
             _ = model.presentation
+            _ = model.isPillVisible
             _ = model.attentionLines
             _ = model.hasAttentionButtons
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
+                    self?.applyVisibility(animated: true)
                     self?.applyPresentation()
                     self?.observePresentation()
                 }
             }
+        }
+    }
+
+    /// Shows the panel while Claude Code is open and takes it off the screen when it is not.
+    private func applyVisibility(animated: Bool) {
+        guard let panel else { return }
+        let visible = model.isPillVisible
+        guard visible != panel.isVisible || (visible && panel.alphaValue < 1) else { return }
+        if visible {
+            panel.alphaValue = animated ? 0 : 1
+            panel.orderFrontRegardless()
+            if animated {
+                NSAnimationContext.runAnimationGroup { $0.duration = 0.25; panel.animator().alphaValue = 1 }
+            }
+        } else {
+            hover.mouseExited(at: Date())
+            model.hoverExpanded = false
+            guard animated else { panel.orderOut(nil); return }
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.25
+                panel.animator().alphaValue = 0
+            }, completionHandler: { [weak self] in
+                MainActor.assumeIsolated {
+                    // A session may have started during the fade.
+                    if self?.model.isPillVisible == false { panel.orderOut(nil) } else { panel.alphaValue = 1 }
+                }
+            })
         }
     }
 

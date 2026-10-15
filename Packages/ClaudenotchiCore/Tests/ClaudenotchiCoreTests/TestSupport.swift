@@ -32,6 +32,6 @@ struct ScriptedIdle: IdleScheduling {
     }
 }
 
-func event(_ type: SessionEvent.EventType, tool: String? = nil, at time: Date, session: String = "s1") -> SessionEvent {
-    SessionEvent(sessionID: session, type: type, tool: tool, timestamp: time)
+func event(_ type: SessionEvent.EventType, tool: String? = nil, notificationType: String? = nil, at time: Date, session: String = "s1") -> SessionEvent {
+    SessionEvent(sessionID: session, type: type, tool: tool, timestamp: time, notificationType: notificationType)
 }

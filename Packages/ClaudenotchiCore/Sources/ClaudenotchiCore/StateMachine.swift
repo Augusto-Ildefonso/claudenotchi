@@ -35,6 +35,8 @@ public struct StateMachine {
 
     public mutating func handle(_ event: SessionEvent) {
         let now = event.timestamp
+        // A reminder such as `idle_prompt` (sent 60 s after Claude finished) is not activity and not a request.
+        if event.type == .notification, !shouldAskForInput(event) { return }
         lastActivity = now
         switch event.type {
         case .userPromptSubmit:
@@ -102,6 +104,21 @@ public struct StateMachine {
             }
         case .thinking, .coding, .reading, .bash, .web, .needsInput, .sleeping:
             break
+        }
+    }
+
+    /// Whether a notification is Claude asking the user for something right now. Claude Code sends the permission
+    /// notification about 6 s after the dialog opened, which can be after the work already went on or finished,
+    /// and a prompt can only exist while a turn is running. The real `PermissionRequest` hook is the primary
+    /// signal; the notification only matters for a turn in progress.
+    private func shouldAskForInput(_ event: SessionEvent) -> Bool {
+        switch event.notificationType {
+        case nil, "permission_prompt", "elicitation_dialog": break
+        default: return false // idle_prompt, auth_success, and types not known yet
+        }
+        switch state {
+        case .waiting, .videogame, .tennis, .sleeping, .done: return false
+        case .thinking, .coding, .reading, .bash, .web, .needsInput, .error: return true
         }
     }
 
