@@ -118,6 +118,8 @@ public struct SessionEvent: Equatable, Sendable, Codable {
             transcriptPath: object["transcript_path"] as? String,
             timestamp: receivedAt,
             isInterrupt: object["is_interrupt"] as? Bool ?? false,
+            // Every permission request holds its connection open. Ones the notch cannot answer (see
+            // ToolSummary.needsTerminal) are only watched: Claude Code kills the hook when the dialog is cancelled.
             expectsReply: type == .permissionRequest
         )
     }

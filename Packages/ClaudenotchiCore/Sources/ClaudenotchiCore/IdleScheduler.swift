@@ -19,23 +19,36 @@ public protocol IdleScheduling {
 /// Picks a random idle activity every 30-90 seconds. The RNG is injectable; the clock is
 /// whatever `now` the caller passes in, so tests never wait.
 public struct IdleScheduler: IdleScheduling {
-    public static let activities: [CompanionState] = [.waiting, .videogame, .tennis]
+    public static let defaultActivities: [CompanionState] = [.waiting, .videogame, .tennis]
     public static let delayRange: ClosedRange<TimeInterval> = 30...90
 
-    private var nextRandom: () -> UInt64
-
-    public init() {
-        self.init(rng: SystemRandomNumberGenerator())
+    /// Turns the manifest's `idle` names into activities. Unknown names and states the machine does not
+    /// rotate through are dropped, duplicates collapse, and an unusable list gives the defaults.
+    public static func activities(fromManifestNames names: [String]) -> [CompanionState] {
+        var result: [CompanionState] = []
+        for name in names {
+            guard let state = CompanionState(rawValue: name), state.isIdleActivity, !result.contains(state) else { continue }
+            result.append(state)
+        }
+        return result.isEmpty ? defaultActivities : result
     }
 
-    public init<G: RandomNumberGenerator>(rng: G) {
+    private let activities: [CompanionState]
+    private var nextRandom: () -> UInt64
+
+    public init(activities: [CompanionState] = IdleScheduler.defaultActivities) {
+        self.init(activities: activities, rng: SystemRandomNumberGenerator())
+    }
+
+    public init<G: RandomNumberGenerator>(activities: [CompanionState] = IdleScheduler.defaultActivities, rng: G) {
         var generator = rng
+        self.activities = activities
         nextRandom = { generator.next() }
     }
 
     public mutating func next(after now: Date) -> IdleChoice {
         var generator = ClosureGenerator(source: nextRandom)
-        let activity = Self.activities.randomElement(using: &generator) ?? .waiting
+        let activity = activities.randomElement(using: &generator) ?? .waiting
         let delay = TimeInterval.random(in: Self.delayRange, using: &generator)
         return IdleChoice(activity: activity, at: now.addingTimeInterval(delay))
     }

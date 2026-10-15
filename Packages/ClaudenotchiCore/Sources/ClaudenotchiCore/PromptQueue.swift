@@ -22,6 +22,10 @@ public struct PendingPrompt: Equatable, Sendable, Identifiable {
         self.tty = tty
     }
 
+    /// False for questions and plans: Claude Code fires the permission hook for them, but only the terminal can
+    /// answer. The notch still shows them, without buttons, and watches for the dialog being cancelled.
+    public var canAnswerFromNotch: Bool { !ToolSummary.needsTerminal(tool: tool) }
+
     /// Nil unless the event carries the request id the server assigned.
     public init?(event: SessionEvent) {
         guard let id = event.requestID else { return nil }

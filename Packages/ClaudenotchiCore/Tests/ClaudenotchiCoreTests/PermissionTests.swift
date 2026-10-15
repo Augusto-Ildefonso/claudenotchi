@@ -105,6 +105,43 @@ import Testing
     @Test func noToolAtAll() {
         #expect(describe(nil) == "Permission requested")
     }
+
+    // MARK: requests only the terminal can answer
+
+    @Test func aQuestionShowsItsText() {
+        let input: [String: Any] = ["questions": [["question": "Cats or dogs?", "header": "Pets", "multiSelect": false]]]
+        #expect(describe("AskUserQuestion", input) == "Question: Cats or dogs?")
+    }
+
+    @Test func severalQuestionsShowTheFirstAndHowManyMore() {
+        let input: [String: Any] = ["questions": [["question": "Cats or dogs?"], ["question": "Tea or coffee?"], ["question": "Sun or rain?"]]]
+        #expect(describe("AskUserQuestion", input) == "Question: Cats or dogs? (+2 more)")
+    }
+
+    @Test func aQuestionWithoutTextIsStillDescribed() {
+        #expect(describe("AskUserQuestion", [:]) == "Claude has a question for you")
+        #expect(describe("AskUserQuestion", ["questions": []]) == "Claude has a question for you")
+        #expect(describe("AskUserQuestion", nil) == "Claude has a question for you")
+    }
+
+    @Test func aPlanIsDescribedAsWaitingForApproval() {
+        #expect(describe("ExitPlanMode", ["plan": "1. do things"]) == "Plan ready for your approval")
+        #expect(describe("ExitPlanMode", nil) == "Plan ready for your approval")
+    }
+
+    @Test(arguments: ["AskUserQuestion", "ExitPlanMode"])
+    func theseToolsNeedTheTerminal(tool: String) {
+        #expect(ToolSummary.needsTerminal(tool: tool))
+    }
+
+    @Test(arguments: ["Bash", "Edit", "Write", "Read", "WebFetch", "Task", "mcp__github__list_prs", "EnterPlanMode", ""])
+    func ordinaryToolsCanBeAnsweredFromTheNotch(tool: String) {
+        #expect(ToolSummary.needsTerminal(tool: tool) == false)
+    }
+
+    @Test func noToolMeansAnOrdinaryRequest() {
+        #expect(ToolSummary.needsTerminal(tool: nil) == false)
+    }
 }
 
 @Suite struct PermissionEventParsingTests {
@@ -116,6 +153,21 @@ import Testing
         #expect(event.expectsReply)
         #expect(event.tool == "Bash")
         #expect(event.message == "Bash: touch a.txt")
+    }
+
+    // Real Claude Code fires the permission hook for these, but an `allow` does nothing: the question or the
+    // plan dialog stays in the terminal. The connection is still held open so the app can tell when the
+    // dialog is cancelled (Claude Code kills the waiting hook), but the app never answers it.
+    @Test(arguments: [
+        ("AskUserQuestion", #"{"questions":[{"question":"Cats or dogs?"}]}"#, "Question: Cats or dogs?"),
+        ("ExitPlanMode", #"{"plan":"1. x"}"#, "Plan ready for your approval"),
+    ])
+    func requestsOnlyTheTerminalCanAnswerAreStillWatched(tool: String, input: String, message: String) throws {
+        let json = #"{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"\#(tool)","tool_input":\#(input)}"#
+        let event = try SessionEvent(hookJSON: Data(json.utf8), receivedAt: now)
+        #expect(event.type == .permissionRequest)
+        #expect(event.expectsReply, "kept open so a cancel can be noticed")
+        #expect(event.message == message)
     }
 
     @Test func otherEventsNeverExpectAReply() throws {

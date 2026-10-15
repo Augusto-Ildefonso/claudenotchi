@@ -14,6 +14,7 @@ final class NotchWindowController {
     private var ticker: Task<Void, Never>?
     private var shownPresentation = PillPresentation.collapsed
     private var shownLines = 1
+    private var shownButtons = true
 
     init(model: CompanionModel) {
         self.model = model
@@ -54,7 +55,7 @@ final class NotchWindowController {
         guard let panel else { return }
         geometry = Self.currentGeometry()
         panel.contentView = makeContentView()
-        panel.setFrame(geometry.frame(for: shownPresentation, attentionLines: shownLines), display: true)
+        panel.setFrame(geometry.frame(for: shownPresentation, attentionLines: shownLines, attentionButtons: shownButtons), display: true)
     }
 
     // MARK: Hover
@@ -96,6 +97,7 @@ final class NotchWindowController {
         withObservationTracking {
             _ = model.presentation
             _ = model.attentionLines
+            _ = model.hasAttentionButtons
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
@@ -110,10 +112,13 @@ final class NotchWindowController {
         guard let panel else { return }
         let target = model.presentation
         let lines = model.attentionLines
-        guard target != shownPresentation || (target == .attention && lines != shownLines) else { return }
+        let buttons = model.hasAttentionButtons
+        let attentionChanged = target == .attention && (lines != shownLines || buttons != shownButtons)
+        guard target != shownPresentation || attentionChanged else { return }
         shownPresentation = target
         shownLines = lines
-        let frame = geometry.frame(for: target, attentionLines: lines)
+        shownButtons = buttons
+        let frame = geometry.frame(for: target, attentionLines: lines, attentionButtons: buttons)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)

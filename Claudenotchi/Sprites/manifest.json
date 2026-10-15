@@ -1,11 +1,11 @@
 {
   "states": {
     "waiting": {
-      "frames": 8,
-      "fps": 6,
+      "frames": 46,
+      "fps": 10,
       "size16": "waiting@16.png",
       "size32": "waiting@32.png",
-      "frames32": 8
+      "frames32": 46
     },
     "thinking": {
       "frames": 4,

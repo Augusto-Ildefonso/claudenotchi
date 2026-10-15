@@ -72,6 +72,14 @@ public struct StateMachine {
         transition(to: .thinking, at: now)
     }
 
+    /// The prompt went away with no answer from the app and no hook event: the user cancelled the dialog in
+    /// the terminal (Esc), which Claude Code reports only by killing the waiting hook.
+    public mutating func promptCancelled(at now: Date) {
+        guard state == .needsInput else { return }
+        lastActivity = now
+        transition(to: .waiting, at: now)
+    }
+
     public mutating func tick(now: Date) {
         switch state {
         case .done:
@@ -97,9 +105,7 @@ public struct StateMachine {
         }
     }
 
-    private var isIdle: Bool {
-        state == .waiting || state == .videogame || state == .tennis
-    }
+    private var isIdle: Bool { state.isIdleActivity }
 
     private func errorIsStillShowing(at now: Date) -> Bool {
         state == .error && now.timeIntervalSince(stateSince) < Self.errorDuration

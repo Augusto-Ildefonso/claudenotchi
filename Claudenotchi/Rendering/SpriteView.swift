@@ -23,8 +23,9 @@ struct AnimatedSpriteView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // 16pt and below use the 16px art; larger sizes use the 32px art.
-        if let clip = SpriteLibrary.shared.clip(for: state, size: size > 16 ? 32 : 16) {
+        // The 32px art only at 32pt or more (1pt per art pixel); smaller sizes scale the 16px art, which
+        // stays crisp at 16, 24 and 32pt (2, 3 and 4 screen pixels per art pixel on a 2x display).
+        if let clip = SpriteLibrary.shared.clip(for: state, size: size >= 32 ? 32 : 16) {
             if reduceMotion || clip.frames.count == 1 {
                 SpriteView(image: clip.frames[0], size: size)
             } else {

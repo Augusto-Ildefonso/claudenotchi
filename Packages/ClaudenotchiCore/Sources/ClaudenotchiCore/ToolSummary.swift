@@ -4,8 +4,18 @@ import Foundation
 public enum ToolSummary {
     private static let maxDetailLength = 140
 
+    /// Tools whose prompt needs a choice only the terminal can take. Claude Code fires the permission hook
+    /// for them, but an `allow` from the notch does nothing: the question or plan dialog stays up. So the
+    /// notch only points at the terminal for these, instead of offering Approve.
+    public static func needsTerminal(tool: String?) -> Bool {
+        tool == "AskUserQuestion" || tool == "ExitPlanMode"
+    }
+
     public static func describe(tool: String?, input: [String: Any]?, home: String) -> String {
         guard let tool, !tool.isEmpty else { return "Permission requested" }
+
+        if tool == "ExitPlanMode" { return "Plan ready for your approval" }
+        if tool == "AskUserQuestion" { return describeQuestions(input) }
 
         if tool.hasPrefix("mcp__") {
             let parts = tool.components(separatedBy: "__")
@@ -35,6 +45,16 @@ public enum ToolSummary {
 
         guard let detail, !detail.isEmpty else { return tool }
         return "\(tool): \(truncate(detail))"
+    }
+
+    /// `Question: <first question>`, plus how many more when Claude asks several at once.
+    private static func describeQuestions(_ input: [String: Any]?) -> String {
+        let questions = (input?["questions"] as? [[String: Any]]) ?? []
+        guard let first = questions.first?["question"] as? String, !first.isEmpty else {
+            return "Claude has a question for you"
+        }
+        let more = questions.count - 1
+        return "Question: \(truncate(collapse(first)))" + (more > 0 ? " (+\(more) more)" : "")
     }
 
     private static func string(_ key: String, in input: [String: Any]?) -> String? {

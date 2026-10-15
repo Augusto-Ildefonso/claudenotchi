@@ -110,6 +110,30 @@ import Testing
         #expect(m.state == .coding)
     }
 
+    // Pressing Esc on a dialog sends no hook event at all; the only sign is the waiting hook being killed.
+    @Test func aCancelledPromptLeavesNeedsInput() {
+        var m = machine()
+        m.handle(event(.permissionRequest, at: t0))
+        m.promptCancelled(at: t0.addingTimeInterval(4))
+        #expect(m.state == .waiting)
+        #expect(m.stateSince == t0.addingTimeInterval(4))
+    }
+
+    @Test func cancellingWhenNothingIsWaitingChangesNothing() {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Edit", at: t0))
+        m.promptCancelled(at: t0.addingTimeInterval(1))
+        #expect(m.state == .coding)
+    }
+
+    @Test func aCancelledPromptCountsAsActivityForSleep() {
+        var m = machine(idle: [(.waiting, 1_000)])
+        m.handle(event(.permissionRequest, at: t0))
+        m.promptCancelled(at: t0.addingTimeInterval(250))
+        m.tick(now: t0.addingTimeInterval(540))
+        #expect(m.state == .waiting, "290s after the cancel is still within the 5 minutes")
+    }
+
     // MARK: error
 
     @Test func toolFailureShowsError() {

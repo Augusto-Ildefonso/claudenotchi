@@ -28,6 +28,9 @@ public struct NotchGeometry: Equatable, Sendable {
     public static let attentionContentHeight: CGFloat = 98
     /// Extra height when the request text wraps to a second line.
     public static let attentionLineHeight: CGFloat = 15
+    /// How much taller the button row is than the one-line hint that replaces it when there is nothing to
+    /// approve (a question or a plan, which only the terminal can answer).
+    public static let attentionButtonRowHeight: CGFloat = 17
 
     public let hasNotch: Bool
     /// Notch rectangle in global screen coordinates (origin bottom-left). Zero-sized when `hasNotch` is false.
@@ -94,17 +97,20 @@ public struct NotchGeometry: Equatable, Sendable {
     }
 
     /// Frame of the attention panel: like the hover panel, but wider, and as tall as its content.
-    /// - Parameter lines: how many lines the request text takes (1 or 2); the panel grows by one line height.
-    public func attentionFrame(lines: Int = 1) -> CGRect {
-        let extra = CGFloat(min(max(lines, 1), 2) - 1) * Self.attentionLineHeight
-        return panelFrame(width: Self.attentionWidth, contentHeight: Self.attentionContentHeight + extra)
+    /// - Parameters:
+    ///   - lines: how many lines the request text takes (1 or 2); the panel grows by one line height.
+    ///   - hasButtons: false when only the terminal can answer, so there is no button row to make room for.
+    public func attentionFrame(lines: Int = 1, hasButtons: Bool = true) -> CGRect {
+        let extraLines = CGFloat(min(max(lines, 1), 2) - 1) * Self.attentionLineHeight
+        let buttons = hasButtons ? 0 : Self.attentionButtonRowHeight
+        return panelFrame(width: Self.attentionWidth, contentHeight: Self.attentionContentHeight + extraLines - buttons)
     }
 
-    public func frame(for presentation: PillPresentation, attentionLines: Int = 1) -> CGRect {
+    public func frame(for presentation: PillPresentation, attentionLines: Int = 1, attentionButtons: Bool = true) -> CGRect {
         switch presentation {
         case .collapsed: collapsedFrame
         case .hover: expandedFrame
-        case .attention: attentionFrame(lines: attentionLines)
+        case .attention: attentionFrame(lines: attentionLines, hasButtons: attentionButtons)
         }
     }
 

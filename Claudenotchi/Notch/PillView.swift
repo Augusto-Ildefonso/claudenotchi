@@ -7,6 +7,8 @@ struct PillView: View {
     let geometry: NotchGeometry
     let model: CompanionModel
 
+    @AppStorage(AppSettings.mascotSizeKey) private var mascotSize = AppSettings.defaultMascotSize
+
     private static let approveColor = Color(red: 0x2F / 255, green: 0x9E / 255, blue: 0x5B / 255)
     private static let denyColor = Color(red: 0xC0 / 255, green: 0x38 / 255, blue: 0x3D / 255)
 
@@ -15,16 +17,19 @@ struct PillView: View {
         let radius = presentation == .collapsed ? geometry.bottomCornerRadius : geometry.expandedBottomCornerRadius
         let shape = UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius)
 
-        // The black shape is the *background* of a view that simply takes the window's size. The three
-        // layouts are overlays: they have fixed, different sizes, and as siblings in a ZStack the largest
-        // would inflate the shape and push its rounded corners out of the visible window.
+        // The black shape is the *background* of a view that simply takes the window's size. Each layout
+        // is its own overlay with its own alignment: they have fixed, different sizes, and as siblings in
+        // one ZStack the widest would set the stack's width, inflate the shape (pushing its rounded corners
+        // out of the window) and shift the collapsed mascot, which hugs the left edge, off screen.
         Color.clear
+            .overlay(alignment: .topLeading) {
+                collapsedContent.opacity(presentation == .collapsed ? 1 : 0)
+            }
             .overlay(alignment: .top) {
-                ZStack(alignment: .top) {
-                    collapsedContent.opacity(presentation == .collapsed ? 1 : 0)
-                    hoverContent.opacity(presentation == .hover ? 1 : 0)
-                    attentionContent.opacity(presentation == .attention ? 1 : 0)
-                }
+                hoverContent.opacity(presentation == .hover ? 1 : 0)
+            }
+            .overlay(alignment: .top) {
+                attentionContent.opacity(presentation == .attention ? 1 : 0)
             }
             .background(shape.fill(Color.black))
             .clipShape(shape)
@@ -33,11 +38,13 @@ struct PillView: View {
 
     // MARK: Collapsed
 
-    /// 16px mascot in the left extension, vertically centered in the notch-height bar.
+    /// The mascot centered in the left extension (beside the notch), vertically centered in the
+    /// notch-height bar. Its size is the user's choice; see `AppSettings.mascotSizeOptions`.
     private var collapsedContent: some View {
-        AnimatedSpriteView(state: model.state, since: model.stateSince, size: 16)
-            .padding(.leading, geometry.hasNotch ? 16 : 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        let size = CGFloat(mascotSize)
+        let leading = geometry.hasNotch ? max(4, (NotchGeometry.pillExtension - size) / 2) : 12
+        return AnimatedSpriteView(state: model.state, since: model.stateSince, size: size)
+            .padding(.leading, leading)
             .frame(height: geometry.topInset)
     }
 
@@ -76,7 +83,7 @@ struct PillView: View {
                 HStack(alignment: .top, spacing: 12) {
                     AnimatedSpriteView(state: model.state, since: model.stateSince, size: 32)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(model.currentPrompt == nil ? "Needs your input" : "Claude needs your permission")
+                        Text(model.hasAttentionButtons ? "Claude needs your permission" : "Needs your input")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                         Text(model.attentionMessage)
@@ -88,7 +95,7 @@ struct PillView: View {
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 10) {
-                    if model.currentPrompt != nil {
+                    if model.hasAttentionButtons {
                         Button("Approve") { model.approve() }
                             .buttonStyle(PillButtonStyle(color: Self.approveColor))
                             .accessibilityLabel("Approve")
@@ -117,7 +124,9 @@ struct PillView: View {
 
     /// Content height for the current request text: one line, or one line taller when it wraps.
     private var attentionHeight: CGFloat {
-        NotchGeometry.attentionContentHeight + (model.attentionLines > 1 ? NotchGeometry.attentionLineHeight : 0)
+        NotchGeometry.attentionContentHeight
+            + (model.attentionLines > 1 ? NotchGeometry.attentionLineHeight : 0)
+            - (model.hasAttentionButtons ? 0 : NotchGeometry.attentionButtonRowHeight)
     }
 
     private var attentionHint: String {

@@ -17,6 +17,16 @@ enum AppSettings {
         ("3 seconds", 3),
     ]
 
+    /// Size in points of the mascot in the collapsed pill. 16, 24 and 32 are whole multiples of the 16px art
+    /// at 2x (2, 3 and 4 screen pixels per art pixel), so the pixels stay sharp.
+    static let mascotSizeKey = "mascotSize"
+    static let defaultMascotSize = 24.0
+    static let mascotSizeOptions: [(label: String, points: Double)] = [
+        ("Small", 16),
+        ("Medium", 24),
+        ("Large", 32),
+    ]
+
     /// Whether the 8-bit chimes play (needs input, done). On by default.
     static let soundsEnabledKey = "soundsEnabled"
 

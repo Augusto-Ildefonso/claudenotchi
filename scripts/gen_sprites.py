@@ -85,18 +85,50 @@ BLINK = NOEYES + [P(4, 5, "K"), P(11, 5, "K")]
 
 S = {}
 
-# waiting: 8-frame walk cycle (stand, step right, back, blink, step left, back)
+# waiting: a crab-style scuttle. The body faces front (eyes never turn toward the direction of travel) and
+# slides sideways one pixel at a time while the legs skitter in alternating pairs. It rests on each side for
+# over a second (with a leg twitch and a blink) before scuttling across.
 LEGS_A = [R(2, 13, 3, 13, "D"), R(2, 14, 3, 14, "."), R(9, 13, 10, 13, "D"), R(9, 14, 10, 14, ".")]
 LEGS_B = [R(5, 13, 6, 13, "D"), R(5, 14, 6, 14, "."), R(12, 13, 13, 13, "D"), R(12, 14, 13, 14, ".")]
 
 
-def walk(legs, dx, eye_dx):
-    return mk(eyes(4, 2, eye_dx) + NOARMS + legs, dx, 0,
-              [P(1 + dx, 6, "O"), P(1 + dx, 7, "O"), P(14 + dx, 6, "O"), P(14 + dx, 7, "O")])
+def scuttle(legs, dx, eyes_patch=None):
+    """Body at sideways offset `dx`, legs lifted in pair `legs`; the side arms are single nubs so they never clip."""
+    return mk((eyes_patch or eyes(4, 2, 0)) + NOARMS + legs, dx,
+              after=[P(1 + dx, 6, "O"), P(1 + dx, 7, "O"), P(14 + dx, 6, "O"), P(14 + dx, 7, "O")])
 
 
-S["waiting"] = (6, [mk(), walk(LEGS_A, 1, 1), walk(LEGS_B, 2, 1), walk(LEGS_A, 1, 1),
-                    mk(BLINK), walk(LEGS_B, -1, -1), walk(LEGS_A, -2, -1), walk(LEGS_B, -1, -1)])
+STAND = mk()
+
+
+def step(position):
+    """One pixel of travel takes two frames (legs A, then legs B), so the scuttle is quick on the legs
+    but covers ground slowly."""
+    return [scuttle(LEGS_A, position), scuttle(LEGS_B, position)]
+
+
+def dwell(position, frames, twitch_at=(), blink_at=()):
+    """Stay put at `position`, with a leg twitch and a blink now and then so he is not frozen."""
+    out = []
+    for i in range(frames):
+        if i in blink_at:
+            out.append(scuttle([], position, BLINK) if position else mk(BLINK))
+        elif i in twitch_at:
+            out.append(scuttle(LEGS_A if i % 2 else LEGS_B, position))
+        else:
+            out.append(scuttle([], position) if position else STAND)
+    return out
+
+
+# Centre, scuttle right, rest on the right for over a second, scuttle across to the left, rest there,
+# scuttle home. About 4.6 s per loop at 10 fps.
+S["waiting"] = (10,
+    dwell(0, 6, blink_at=(4,))
+    + step(1) + step(2)
+    + dwell(2, 12, twitch_at=(3, 8), blink_at=(6,))
+    + step(1) + step(0) + step(-1) + step(-2)
+    + dwell(-2, 12, twitch_at=(3, 9), blink_at=(7,))
+    + step(-1) + step(0))
 
 
 def thinking(dots, dx=0):

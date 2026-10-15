@@ -127,6 +127,27 @@ import Testing
         #expect(g.attentionFrame(lines: 2).height == g.attentionFrame(lines: 1).height + NotchGeometry.attentionLineHeight)
     }
 
+    @Test func withoutButtonsThePanelDropsTheButtonRow() {
+        let g = notchScreen()
+        let with = g.attentionFrame(lines: 1, hasButtons: true)
+        let without = g.attentionFrame(lines: 1, hasButtons: false)
+        #expect(without.height == with.height - NotchGeometry.attentionButtonRowHeight)
+        #expect(without.maxY == with.maxY)
+        #expect(without.midX == with.midX)
+        #expect(without.width == with.width)
+    }
+
+    @Test func theButtonRowSavingsCombineWithExtraLines() {
+        let g = notchScreen()
+        #expect(g.attentionFrame(lines: 2, hasButtons: false).height
+                == g.notchRect.height + NotchGeometry.attentionContentHeight + NotchGeometry.attentionLineHeight - NotchGeometry.attentionButtonRowHeight)
+    }
+
+    @Test func buttonsAreTheDefault() {
+        let g = notchScreen()
+        #expect(g.attentionFrame() == g.attentionFrame(lines: 1, hasButtons: true))
+    }
+
     @Test func attentionLinesAreClampedToOneOrTwo() {
         let g = notchScreen()
         #expect(g.attentionFrame(lines: 0) == g.attentionFrame(lines: 1))
@@ -160,6 +181,7 @@ import Testing
         #expect(g.frame(for: .hover) == g.expandedFrame)
         #expect(g.frame(for: .attention) == g.attentionFrame())
         #expect(g.frame(for: .attention, attentionLines: 2) == g.attentionFrame(lines: 2))
+        #expect(g.frame(for: .attention, attentionLines: 1, attentionButtons: false) == g.attentionFrame(lines: 1, hasButtons: false))
     }
 
     @Test func topInsetIsTheHeightOfTheBlackBarAboveTheContent() {

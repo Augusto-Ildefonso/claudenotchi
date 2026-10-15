@@ -104,3 +104,23 @@ import Testing
         #expect(try #require(PendingPrompt(event: event)).message == "Permission requested")
     }
 }
+
+@Suite struct PromptAnswerabilityTests {
+    private func prompt(tool: String?) -> PendingPrompt {
+        PendingPrompt(id: "r", sessionID: "s", tool: tool, message: "m", cwd: nil, ancestorPIDs: [], tty: nil)
+    }
+
+    @Test(arguments: ["Bash", "Edit", "Write", "WebFetch", "mcp__github__list_prs"])
+    func ordinaryPromptsCanBeAnsweredFromTheNotch(tool: String) {
+        #expect(prompt(tool: tool).canAnswerFromNotch)
+    }
+
+    @Test(arguments: ["AskUserQuestion", "ExitPlanMode"])
+    func questionsAndPlansNeedTheTerminal(tool: String) {
+        #expect(prompt(tool: tool).canAnswerFromNotch == false)
+    }
+
+    @Test func anUnknownToolIsAnsweredFromTheNotch() {
+        #expect(prompt(tool: nil).canAnswerFromNotch)
+    }
+}

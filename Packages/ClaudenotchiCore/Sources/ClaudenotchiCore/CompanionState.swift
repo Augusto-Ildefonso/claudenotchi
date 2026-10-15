@@ -4,6 +4,14 @@ public enum CompanionState: String, Sendable, CaseIterable {
     case needsInput, error, done
     case videogame, tennis, sleeping
 
+    /// The states the mascot rotates through while nothing is happening.
+    public var isIdleActivity: Bool {
+        switch self {
+        case .waiting, .videogame, .tennis: true
+        default: false
+        }
+    }
+
     /// Short status line for the expanded pill.
     public var title: String {
         switch self {

@@ -25,6 +25,11 @@ final class SpriteLibrary {
     private lazy var manifest: SpriteManifest? = Self.loadManifest(log: log)
     private var clips: [Key: SpriteClip] = [:]
 
+    /// The idle activities named in the manifest (the defaults when the manifest is missing or unusable).
+    var idleActivities: [CompanionState] {
+        IdleScheduler.activities(fromManifestNames: manifest?.idle ?? [])
+    }
+
     /// - Parameter size: 16 for the collapsed pill, 32 for the expanded view. A state without 32px art
     ///   falls back to its 16px frames (the caller scales them with nearest-neighbor).
     func clip(for state: CompanionState, size: Int = 16) -> SpriteClip? {

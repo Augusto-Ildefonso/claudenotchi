@@ -4,6 +4,7 @@ import SwiftUI
 struct ClaudenotchiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage(AppSettings.hoverDelayKey) private var hoverDelay = AppSettings.defaultHoverDelay
+    @AppStorage(AppSettings.mascotSizeKey) private var mascotSize = AppSettings.defaultMascotSize
     @AppStorage(AppSettings.soundsEnabledKey) private var soundsEnabled = true
 
     var body: some Scene {
@@ -11,6 +12,11 @@ struct ClaudenotchiApp: App {
             Picker("Expand on hover", selection: $hoverDelay) {
                 ForEach(AppSettings.hoverDelayOptions, id: \.seconds) { option in
                     Text(option.label).tag(option.seconds)
+                }
+            }
+            Picker("Mascot size", selection: $mascotSize) {
+                ForEach(AppSettings.mascotSizeOptions, id: \.points) { option in
+                    Text(option.label).tag(option.points)
                 }
             }
             Toggle("Play sounds", isOn: $soundsEnabled)

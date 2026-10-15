@@ -19,12 +19,13 @@ final class CompanionModel {
     @ObservationIgnored private var lastAncestors: [Int] = []
     @ObservationIgnored private var lastTTY: String?
 
-    @ObservationIgnored private var machine = StateMachine(now: Date())
+    @ObservationIgnored private var machine: StateMachine
     @ObservationIgnored private let server: EventServer
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private let log = Logger(subsystem: "dev.claudenotchi.Claudenotchi", category: "model")
 
     init(socketPath: String = SocketPath.default()) {
+        machine = StateMachine(now: Date(), scheduler: IdleScheduler(activities: SpriteLibrary.shared.idleActivities))
         server = EventServer(path: socketPath)
     }
 
@@ -37,6 +38,10 @@ final class CompanionModel {
     }
 
     var currentPrompt: PendingPrompt? { prompts.current }
+
+    /// Approve / Deny only exist while the shown prompt is one the notch can answer. A question or a plan
+    /// (Claude Code fires the permission hook for them too) can only be answered in the terminal.
+    var hasAttentionButtons: Bool { prompts.current?.canAnswerFromNotch ?? false }
 
     /// Second line of the expanded pill: what Claude is asking, or the project folder.
     var detail: String {
@@ -72,6 +77,12 @@ final class CompanionModel {
             for await id in server.cancellations {
                 log.info("prompt \(id.prefix(8), privacy: .public) closed: the helper hung up")
                 prompts.remove(id: id)
+                // Esc on a dialog sends no hook event; Claude Code only kills the waiting hook. With nothing
+                // else waiting, the user is no longer being asked for anything.
+                if prompts.isEmpty {
+                    machine.promptCancelled(at: Date())
+                    publish()
+                }
             }
         })
         tasks.append(Task {
@@ -96,7 +107,7 @@ final class CompanionModel {
     func deny() { answer(.deny(message: "Denied from Claudenotchi")) }
 
     private func answer(_ decision: PermissionDecision) {
-        guard let prompt = prompts.current else { return }
+        guard let prompt = prompts.current, prompt.canAnswerFromNotch else { return }
         prompts.remove(id: prompt.id)
         let delivered = server.reply(to: prompt.id, with: decision)
         log.info("prompt \(prompt.id.prefix(8), privacy: .public) answered in the notch: \(String(describing: decision), privacy: .public), delivered: \(delivered)")
