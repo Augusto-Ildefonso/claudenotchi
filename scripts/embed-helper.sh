@@ -3,13 +3,17 @@
 # bundle at Contents/Helpers/claudenotchi-hook. At runtime the app copies it to a stable path
 # (see HelperDeployer) and registers that copy in Claude Code's settings.json.
 #
-# Note: builds for the host architecture only. A universal (arm64 + x86_64) helper is needed for
-# distribution and is part of the release milestone.
+# Debug builds target the host architecture only. Release builds are universal (arm64 + x86_64) so
+# the helper matches the universal app.
 set -eu
 
 PACKAGE="$SRCROOT/Packages/ClaudenotchiCore"
 CONFIG=debug
-[ "${CONFIGURATION:-Debug}" = "Release" ] && CONFIG=release
+ARCH_FLAGS=""
+if [ "${CONFIGURATION:-Debug}" = "Release" ]; then
+  CONFIG=release
+  ARCH_FLAGS="--arch arm64 --arch x86_64"
+fi
 SCRATCH="${DERIVED_FILE_DIR:-${TMPDIR:-/tmp}}/hook-helper-build"
 DEST="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 
@@ -17,11 +21,11 @@ DEST="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
 swiftpm() {
   if [ -n "${DEVELOPER_DIR:-}" ]; then
     env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" DEVELOPER_DIR="$DEVELOPER_DIR" \
-      /usr/bin/xcrun swift build -c "$CONFIG" --product claudenotchi-hook \
+      /usr/bin/xcrun swift build -c "$CONFIG" --product claudenotchi-hook $ARCH_FLAGS \
       --package-path "$PACKAGE" --scratch-path "$SCRATCH" "$@"
   else
     env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
-      /usr/bin/xcrun swift build -c "$CONFIG" --product claudenotchi-hook \
+      /usr/bin/xcrun swift build -c "$CONFIG" --product claudenotchi-hook $ARCH_FLAGS \
       --package-path "$PACKAGE" --scratch-path "$SCRATCH" "$@"
   fi
 }
