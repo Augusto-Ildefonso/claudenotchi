@@ -10,9 +10,20 @@ public final class EventServer: @unchecked Sendable {
     }
 
     public let events: AsyncStream<SessionEvent>
+    /// Request ids of permission prompts whose helper hung up before an answer was sent
+    /// (for example, the user answered in the terminal and Claude Code killed the helper).
+    public let cancellations: AsyncStream<String>
+
+    /// A permission request waiting for the user: its open connection and a hang-up watcher.
+    private struct PendingConnection {
+        let descriptor: Int32
+        let source: DispatchSourceRead
+    }
 
     private let path: String
     private let continuation: AsyncStream<SessionEvent>.Continuation
+    private let cancellationContinuation: AsyncStream<String>.Continuation
+    private var pending: [String: PendingConnection] = [:]
     private let lock = NSLock()
     private var listener: Int32 = -1
     private var wakeRead: Int32 = -1
@@ -25,6 +36,9 @@ public final class EventServer: @unchecked Sendable {
         var captured: AsyncStream<SessionEvent>.Continuation!
         events = AsyncStream(bufferingPolicy: .unbounded) { captured = $0 }
         continuation = captured
+        var capturedCancellations: AsyncStream<String>.Continuation!
+        cancellations = AsyncStream(bufferingPolicy: .unbounded) { capturedCancellations = $0 }
+        cancellationContinuation = capturedCancellations
     }
 
     public func start() throws {
@@ -90,7 +104,68 @@ public final class EventServer: @unchecked Sendable {
         close(readEnd)
         close(writeEnd)
         unlink(path)
+
+        // Release helpers still waiting for an answer: they see end-of-file and print nothing.
+        lock.lock()
+        let waiting = pending
+        pending = [:]
+        lock.unlock()
+        for connection in waiting.values { connection.source.cancel() }
+
         continuation.finish()
+        cancellationContinuation.finish()
+    }
+
+    // MARK: Permission prompts
+
+    /// Sends the user's answer to the helper waiting on `requestID` and closes the connection.
+    /// Returns false when that request is no longer waiting (already answered, cancelled or hung up).
+    @discardableResult
+    public func reply(to requestID: String, with decision: PermissionDecision) -> Bool {
+        guard let line = try? decision.wireLine(), let connection = take(requestID) else { return false }
+        let delivered = UnixSocket.writeAll(connection.descriptor, line)
+        connection.source.cancel() // closes the descriptor
+        return delivered
+    }
+
+    /// Releases the helper without an answer, so Claude Code falls back to its own prompt.
+    public func cancel(requestID: String) {
+        take(requestID)?.source.cancel()
+    }
+
+    private func take(_ requestID: String) -> PendingConnection? {
+        lock.lock()
+        defer { lock.unlock() }
+        return pending.removeValue(forKey: requestID)
+    }
+
+    /// Keeps `client` open for a reply and publishes the event with its request id.
+    private func hold(_ client: Int32, for event: SessionEvent) {
+        var event = event
+        let id = UUID().uuidString
+        event.requestID = id
+
+        let source = DispatchSource.makeReadSource(fileDescriptor: client, queue: .global(qos: .userInitiated))
+        source.setEventHandler { [weak self] in self?.clientActivity(requestID: id, descriptor: client) }
+        source.setCancelHandler { close(client) }
+
+        lock.lock()
+        pending[id] = PendingConnection(descriptor: client, source: source)
+        lock.unlock()
+        source.resume()
+        continuation.yield(event)
+    }
+
+    /// The helper has nothing more to say; readable means it hung up (or sent something we ignore).
+    private func clientActivity(requestID: String, descriptor: Int32) {
+        var byte: UInt8 = 0
+        let count = Darwin.read(descriptor, &byte, 1)
+        if count < 0, errno == EINTR || errno == EAGAIN { return }
+        if count > 0 { return }
+        if let connection = take(requestID) {
+            connection.source.cancel()
+            cancellationContinuation.yield(requestID)
+        }
     }
 
     private var isStopped: Bool {
@@ -129,7 +204,8 @@ public final class EventServer: @unchecked Sendable {
     }
 
     private func read(from client: Int32) {
-        defer { close(client) }
+        var handedOff = false
+        defer { if !handedOff { close(client) } }
         var buffer = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         while true {
@@ -140,7 +216,13 @@ public final class EventServer: @unchecked Sendable {
             while let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
                 let line = buffer[buffer.startIndex..<newline]
                 buffer.removeSubrange(buffer.startIndex...newline)
-                if let event = try? SessionEvent(wireLine: Data(line)) { continuation.yield(event) }
+                guard let event = try? SessionEvent(wireLine: Data(line)) else { continue }
+                if event.expectsReply {
+                    handedOff = true
+                    hold(client, for: event)
+                    return
+                }
+                continuation.yield(event)
             }
         }
         if !buffer.isEmpty, let event = try? SessionEvent(wireLine: buffer) { continuation.yield(event) }

@@ -105,6 +105,63 @@ import Testing
         #expect(narrow.expandedFrame.minX >= 0)
     }
 
+    // MARK: attention panel (permission prompt)
+
+    @Test func attentionPanelIsCenteredOnTheNotchAndFlushWithTheTop() {
+        let g = notchScreen()
+        let panel = g.attentionFrame()
+        #expect(panel.width == NotchGeometry.attentionWidth)
+        #expect(panel.midX == g.notchRect.midX)
+        #expect(panel.maxY == 982)
+        #expect(panel.height == g.notchRect.height + NotchGeometry.attentionContentHeight)
+    }
+
+    @Test func attentionPanelHugsItsContentWithoutAnEmptyStrip() {
+        // Header row + buttons + padding come to roughly 98pt; a taller panel leaves a black gap under the buttons.
+        #expect(NotchGeometry.attentionContentHeight <= 100)
+        #expect(NotchGeometry.attentionContentHeight >= 90)
+    }
+
+    @Test func aRequestThatWrapsToASecondLineGetsOneMoreLineOfHeight() {
+        let g = notchScreen()
+        #expect(g.attentionFrame(lines: 2).height == g.attentionFrame(lines: 1).height + NotchGeometry.attentionLineHeight)
+    }
+
+    @Test func attentionLinesAreClampedToOneOrTwo() {
+        let g = notchScreen()
+        #expect(g.attentionFrame(lines: 0) == g.attentionFrame(lines: 1))
+        #expect(g.attentionFrame(lines: 9) == g.attentionFrame(lines: 2))
+    }
+
+    @Test func extraLinesGrowDownwardAndKeepTheTopFlush() {
+        let g = notchScreen()
+        #expect(g.attentionFrame(lines: 2).maxY == g.attentionFrame(lines: 1).maxY)
+        #expect(g.attentionFrame(lines: 2).midX == g.attentionFrame(lines: 1).midX)
+    }
+
+    @Test func attentionPanelIsRoomierThanTheHoverPanel() {
+        for g in [notchScreen(), plainScreen()] {
+            #expect(g.attentionFrame().width > g.expandedFrame.width)
+            #expect(g.attentionFrame().height > g.expandedFrame.height)
+            #expect(g.attentionFrame().contains(g.expandedFrame))
+        }
+    }
+
+    @Test func attentionPanelStaysOnASmallScreen() {
+        let narrow = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 300, height: 600),
+                                   safeAreaTop: 0, leftAreaWidth: nil, rightAreaWidth: nil)
+        #expect(narrow.attentionFrame().width <= 300)
+        #expect(narrow.attentionFrame().minX >= 0)
+    }
+
+    @Test func frameForEachPresentation() {
+        let g = notchScreen()
+        #expect(g.frame(for: .collapsed) == g.collapsedFrame)
+        #expect(g.frame(for: .hover) == g.expandedFrame)
+        #expect(g.frame(for: .attention) == g.attentionFrame())
+        #expect(g.frame(for: .attention, attentionLines: 2) == g.attentionFrame(lines: 2))
+    }
+
     @Test func topInsetIsTheHeightOfTheBlackBarAboveTheContent() {
         #expect(notchScreen().topInset == 32)
         #expect(plainScreen().topInset == NotchGeometry.fallbackSize.height)

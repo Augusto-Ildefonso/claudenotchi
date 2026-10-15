@@ -64,6 +64,14 @@ public struct StateMachine {
         }
     }
 
+    /// The user answered a permission prompt in the app: Claude goes on working, so show it right away
+    /// instead of waiting for the next hook event.
+    public mutating func promptAnswered(at now: Date) {
+        guard state == .needsInput else { return }
+        lastActivity = now
+        transition(to: .thinking, at: now)
+    }
+
     public mutating func tick(now: Date) {
         switch state {
         case .done:

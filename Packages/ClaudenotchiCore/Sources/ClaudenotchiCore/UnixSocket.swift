@@ -40,4 +40,20 @@ enum UnixSocket {
         }
         return descriptor
     }
+
+    /// Writes every byte, retrying on EINTR. Returns false if the peer is gone or another error occurs.
+    static func writeAll(_ descriptor: Int32, _ data: Data) -> Bool {
+        data.withUnsafeBytes { raw in
+            var offset = 0
+            while offset < raw.count {
+                let written = Darwin.write(descriptor, raw.baseAddress! + offset, raw.count - offset)
+                if written < 0 {
+                    if errno == EINTR { continue }
+                    return false
+                }
+                offset += written
+            }
+            return true
+        }
+    }
 }

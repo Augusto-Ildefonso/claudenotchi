@@ -165,8 +165,13 @@ private func sample(_ type: SessionEvent.EventType = .userPromptSubmit, tool: St
         let delivered = HookRunner.run(stdin: Data(json.utf8), socketPath: path, now: sampleTime)
         #expect(delivered)
 
-        let events = await collect(1, from: server)
-        #expect(events == [SessionEvent(sessionID: "abc", type: .preToolUse, tool: "Bash", cwd: "/tmp/p", timestamp: sampleTime)])
+        let event = try #require(await collect(1, from: server).first)
+        #expect(event.sessionID == "abc")
+        #expect(event.type == .preToolUse)
+        #expect(event.tool == "Bash")
+        #expect(event.cwd == "/tmp/p")
+        #expect(event.timestamp == sampleTime)
+        #expect(event.ancestorPIDs.first == Int(getppid()), "the helper reports the processes above it")
     }
 
     @Test func staysQuietWhenTheAppIsNotRunning() {

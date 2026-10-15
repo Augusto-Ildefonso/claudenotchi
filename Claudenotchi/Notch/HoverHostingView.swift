@@ -21,6 +21,9 @@ final class HoverHostingView<Content: View>: NSHostingView<Content> {
         hoverArea = area
     }
 
+    /// The panel never becomes key, so the first click must already reach the buttons.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseEntered(with event: NSEvent) { onMouseEntered?() }
     override func mouseExited(with event: NSEvent) { onMouseExited?() }
 }

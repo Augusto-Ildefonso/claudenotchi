@@ -68,6 +68,23 @@ import Testing
         #expect(Set(HookInstaller.events) == expected)
     }
 
+    @Test func thePermissionHookMayWaitLongerThanTheOthers() throws {
+        let dir = try makeDirectory()
+        let settings = dir.appendingPathComponent("settings.json")
+        try installer(settings).install()
+
+        func timeout(_ event: String) throws -> Int? {
+            let group = try #require(try hooks(settings)[event]?.first)
+            let hook = try #require((group["hooks"] as? [[String: Any]])?.first)
+            return hook["timeout"] as? Int
+        }
+        #expect(try timeout("PermissionRequest") == HookInstaller.permissionHookTimeout)
+        #expect(HookInstaller.permissionHookTimeout >= 300, "the user needs time to answer")
+        for event in HookInstaller.events where event != "PermissionRequest" {
+            #expect(try timeout(event) == 10, "\(event) must stay quick")
+        }
+    }
+
     @Test func installKeepsEveryUnrelatedSetting() throws {
         let dir = try makeDirectory()
         let settings = dir.appendingPathComponent("settings.json")

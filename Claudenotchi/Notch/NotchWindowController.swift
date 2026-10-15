@@ -1,5 +1,6 @@
 import AppKit
 import ClaudenotchiCore
+import Observation
 import SwiftUI
 
 /// Owns the notch panel: keeps it aligned with the screen's notch and expands it on hover.
@@ -11,6 +12,8 @@ final class NotchWindowController {
 
     private var hover = HoverIntent(expandDelay: AppSettings.hoverDelay())
     private var ticker: Task<Void, Never>?
+    private var shownPresentation = PillPresentation.collapsed
+    private var shownLines = 1
 
     init(model: CompanionModel) {
         self.model = model
@@ -22,6 +25,7 @@ final class NotchWindowController {
         panel.contentView = makeContentView()
         panel.orderFrontRegardless()
         self.panel = panel
+        observePresentation()
 
         observer = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -50,7 +54,7 @@ final class NotchWindowController {
         guard let panel else { return }
         geometry = Self.currentGeometry()
         panel.contentView = makeContentView()
-        panel.setFrame(model.isExpanded ? geometry.expandedFrame : geometry.collapsedFrame, display: true)
+        panel.setFrame(geometry.frame(for: shownPresentation, attentionLines: shownLines), display: true)
     }
 
     // MARK: Hover
@@ -71,7 +75,7 @@ final class NotchWindowController {
     private func evaluateHover() {
         hover.expandDelay = AppSettings.hoverDelay()
         hover.tick(now: Date())
-        setExpanded(hover.isExpanded)
+        model.hoverExpanded = hover.isExpanded
     }
 
     private func startTickerIfNeeded() {
@@ -85,14 +89,35 @@ final class NotchWindowController {
         }
     }
 
-    private func setExpanded(_ expanded: Bool) {
-        guard let panel, expanded != model.isExpanded else { return }
-        model.isExpanded = expanded
-        let target = expanded ? geometry.expandedFrame : geometry.collapsedFrame
+    // MARK: Presentation
+
+    /// Resizes the panel whenever the model asks for another presentation (hover, a permission prompt).
+    private func observePresentation() {
+        withObservationTracking {
+            _ = model.presentation
+            _ = model.attentionLines
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.applyPresentation()
+                    self?.observePresentation()
+                }
+            }
+        }
+    }
+
+    private func applyPresentation() {
+        guard let panel else { return }
+        let target = model.presentation
+        let lines = model.attentionLines
+        guard target != shownPresentation || (target == .attention && lines != shownLines) else { return }
+        shownPresentation = target
+        shownLines = lines
+        let frame = geometry.frame(for: target, attentionLines: lines)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(target, display: true)
+            panel.animator().setFrame(frame, display: true)
         }
     }
 

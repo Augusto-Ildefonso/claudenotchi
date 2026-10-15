@@ -16,6 +16,9 @@ public struct HookInstaller {
     public static let helperName = "claudenotchi-hook"
     /// Seconds Claude Code waits for the helper (it normally returns in milliseconds).
     private static let hookTimeout = 10
+    /// The permission hook waits for you to answer in the notch, so it may take far longer. If it times
+    /// out, Claude Code simply shows its own prompt.
+    public static let permissionHookTimeout = 600
 
     public enum Failure: Error, Equatable {
         case invalidJSON(String)
@@ -50,7 +53,8 @@ public struct HookInstaller {
         for event in Self.events {
             var groups = try groups(hooks[event], event: event)
             groups = removeOurs(from: groups)
-            groups.append(["hooks": [["type": "command", "command": command, "timeout": Self.hookTimeout]]])
+            let timeout = event == "PermissionRequest" ? Self.permissionHookTimeout : Self.hookTimeout
+            groups.append(["hooks": [["type": "command", "command": command, "timeout": timeout]]])
             hooks[event] = groups
         }
         updated["hooks"] = hooks

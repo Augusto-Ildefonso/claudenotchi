@@ -95,6 +95,21 @@ import Testing
         #expect(m.state == .needsInput)
     }
 
+    @Test func answeringThePromptInTheNotchGoesBackToThinking() {
+        var m = machine()
+        m.handle(event(.permissionRequest, at: t0))
+        m.promptAnswered(at: t0.addingTimeInterval(3))
+        #expect(m.state == .thinking)
+        #expect(m.stateSince == t0.addingTimeInterval(3))
+    }
+
+    @Test func answeringWhenNothingIsWaitingChangesNothing() {
+        var m = machine()
+        m.handle(event(.preToolUse, tool: "Edit", at: t0))
+        m.promptAnswered(at: t0.addingTimeInterval(1))
+        #expect(m.state == .coding)
+    }
+
     // MARK: error
 
     @Test func toolFailureShowsError() {

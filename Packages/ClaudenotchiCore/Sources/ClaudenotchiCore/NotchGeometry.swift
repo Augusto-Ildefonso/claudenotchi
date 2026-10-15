@@ -1,5 +1,15 @@
 import CoreGraphics
 
+/// How much of the pill is showing.
+public enum PillPresentation: Equatable, Sendable {
+    /// Just the mascot beside the notch.
+    case collapsed
+    /// Hover: mascot, status and project folder.
+    case hover
+    /// A permission prompt or other request for the user, with room for buttons.
+    case attention
+}
+
 /// Where the pill sits on a screen. Pure value type so it can be unit tested without a display.
 public struct NotchGeometry: Equatable, Sendable {
     /// How far the collapsed pill extends past each side of the notch, so the pill stays symmetric
@@ -11,6 +21,13 @@ public struct NotchGeometry: Equatable, Sendable {
     public static let expandedWidth: CGFloat = 420
     /// Height of the expanded content below the notch-height bar.
     public static let expandedContentHeight: CGFloat = 64
+    /// Width of the attention panel (permission prompt with buttons).
+    public static let attentionWidth: CGFloat = 460
+    /// Height below the notch bar for a one-line request: padding, the mascot / text row, and the
+    /// buttons. Kept tight on purpose; spare height shows as an empty black strip under the buttons.
+    public static let attentionContentHeight: CGFloat = 98
+    /// Extra height when the request text wraps to a second line.
+    public static let attentionLineHeight: CGFloat = 15
 
     public let hasNotch: Bool
     /// Notch rectangle in global screen coordinates (origin bottom-left). Zero-sized when `hasNotch` is false.
@@ -65,11 +82,30 @@ public struct NotchGeometry: Equatable, Sendable {
 
     /// Frame of the hover-expanded panel: centered on the notch, flush with the top, kept on screen.
     public var expandedFrame: CGRect {
-        let width = min(Self.expandedWidth, screenFrame.width)
-        let height = topInset + Self.expandedContentHeight
+        panelFrame(width: Self.expandedWidth, contentHeight: Self.expandedContentHeight)
+    }
+
+    private func panelFrame(width requested: CGFloat, contentHeight: CGFloat) -> CGRect {
+        let width = min(requested, screenFrame.width)
+        let height = topInset + contentHeight
         let centerX = hasNotch ? notchRect.midX : screenFrame.midX
         let x = min(max(centerX - width / 2, screenFrame.minX), screenFrame.maxX - width)
         return CGRect(x: x, y: screenFrame.maxY - height, width: width, height: height)
+    }
+
+    /// Frame of the attention panel: like the hover panel, but wider, and as tall as its content.
+    /// - Parameter lines: how many lines the request text takes (1 or 2); the panel grows by one line height.
+    public func attentionFrame(lines: Int = 1) -> CGRect {
+        let extra = CGFloat(min(max(lines, 1), 2) - 1) * Self.attentionLineHeight
+        return panelFrame(width: Self.attentionWidth, contentHeight: Self.attentionContentHeight + extra)
+    }
+
+    public func frame(for presentation: PillPresentation, attentionLines: Int = 1) -> CGRect {
+        switch presentation {
+        case .collapsed: collapsedFrame
+        case .hover: expandedFrame
+        case .attention: attentionFrame(lines: attentionLines)
+        }
     }
 
     /// Radius of the two bottom corners of the collapsed pill.

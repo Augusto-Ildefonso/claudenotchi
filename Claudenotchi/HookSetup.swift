@@ -46,7 +46,11 @@ final class HookSetup {
     func start() {
         refresh()
         if status == .installed {
-            deployHelper() // pick up a newer helper after an app update
+            do {
+                try deployHelper() // pick up a newer helper after an app update
+            } catch {
+                fail(error)
+            }
         } else if !defaults.bool(forKey: Self.optedOutKey) {
             install()
         }
@@ -85,13 +89,9 @@ final class HookSetup {
     }
 
     @discardableResult
-    private func deployHelper() -> URL {
+    private func deployHelper() throws -> URL {
         let destination = HelperDeployer.defaultDestination()
-        do {
-            try HelperDeployer.deploy(source: embeddedHelper, destination: destination)
-        } catch {
-            fail(error)
-        }
+        try HelperDeployer.deploy(source: embeddedHelper, destination: destination)
         return destination
     }
 

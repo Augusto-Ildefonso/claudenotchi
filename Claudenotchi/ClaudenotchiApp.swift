@@ -4,6 +4,7 @@ import SwiftUI
 struct ClaudenotchiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage(AppSettings.hoverDelayKey) private var hoverDelay = AppSettings.defaultHoverDelay
+    @AppStorage(AppSettings.soundsEnabledKey) private var soundsEnabled = true
 
     var body: some Scene {
         MenuBarExtra("Claudenotchi", systemImage: "pawprint.fill") {
@@ -12,6 +13,7 @@ struct ClaudenotchiApp: App {
                     Text(option.label).tag(option.seconds)
                 }
             }
+            Toggle("Play sounds", isOn: $soundsEnabled)
             Divider()
             HookMenuSection(setup: appDelegate.hookSetup)
             Divider()

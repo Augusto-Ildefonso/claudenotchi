@@ -17,6 +17,13 @@ enum AppSettings {
         ("3 seconds", 3),
     ]
 
+    /// Whether the 8-bit chimes play (needs input, done). On by default.
+    static let soundsEnabledKey = "soundsEnabled"
+
+    static func soundsEnabled(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: soundsEnabledKey) == nil ? true : defaults.bool(forKey: soundsEnabledKey)
+    }
+
     static func hoverDelay(_ defaults: UserDefaults = .standard) -> Double {
         defaults.object(forKey: hoverDelayKey) == nil ? defaultHoverDelay : defaults.double(forKey: hoverDelayKey)
     }

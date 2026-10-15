@@ -37,10 +37,19 @@ public struct SessionEvent: Equatable, Sendable, Codable {
     public var timestamp: Date
     /// True when a failed tool was stopped by the user (Esc), which is not an error to show.
     public var isInterrupt: Bool
+    /// True when the sender waits for a `PermissionDecision` on the same connection (permission prompts).
+    public var expectsReply: Bool
+    /// Assigned by the server to events that expect a reply; pass it to `EventServer.reply`.
+    public var requestID: String?
+    /// Process ids from the hook helper's parent upward, used to find the terminal app.
+    public var ancestorPIDs: [Int]
+    /// Controlling terminal of the session, e.g. `ttys003`.
+    public var tty: String?
 
     public init(
         sessionID: String, type: EventType, tool: String? = nil, message: String? = nil,
-        cwd: String? = nil, transcriptPath: String? = nil, timestamp: Date, isInterrupt: Bool = false
+        cwd: String? = nil, transcriptPath: String? = nil, timestamp: Date, isInterrupt: Bool = false,
+        expectsReply: Bool = false, requestID: String? = nil, ancestorPIDs: [Int] = [], tty: String? = nil
     ) {
         self.sessionID = sessionID
         self.type = type
@@ -50,6 +59,10 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         self.transcriptPath = transcriptPath
         self.timestamp = timestamp
         self.isInterrupt = isInterrupt
+        self.expectsReply = expectsReply
+        self.requestID = requestID
+        self.ancestorPIDs = ancestorPIDs
+        self.tty = tty
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -58,6 +71,10 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         case transcriptPath = "transcript_path"
         case timestamp = "ts"
         case isInterrupt = "interrupt"
+        case expectsReply = "reply"
+        case requestID = "request_id"
+        case ancestorPIDs = "ancestors"
+        case tty
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +87,10 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         transcriptPath = try c.decodeIfPresent(String.self, forKey: .transcriptPath)
         timestamp = try c.decode(Date.self, forKey: .timestamp)
         isInterrupt = try c.decodeIfPresent(Bool.self, forKey: .isInterrupt) ?? false
+        expectsReply = try c.decodeIfPresent(Bool.self, forKey: .expectsReply) ?? false
+        requestID = try c.decodeIfPresent(String.self, forKey: .requestID)
+        ancestorPIDs = try c.decodeIfPresent([Int].self, forKey: .ancestorPIDs) ?? []
+        tty = try c.decodeIfPresent(String.self, forKey: .tty)
     }
 
     /// Builds an event from the JSON Claude Code writes to a hook's stdin.
@@ -80,15 +101,24 @@ public struct SessionEvent: Equatable, Sendable, Codable {
         guard let hookName = object["hook_event_name"] as? String else {
             throw DecodingFailure(reason: "missing hook_event_name")
         }
+        let type = EventType(hookName: hookName)
+        let tool = object["tool_name"] as? String
+        var message = object["message"] as? String
+        if type == .permissionRequest, message == nil {
+            message = ToolSummary.describe(
+                tool: tool, input: object["tool_input"] as? [String: Any], home: NSHomeDirectory()
+            )
+        }
         self.init(
             sessionID: object["session_id"] as? String ?? "unknown",
-            type: EventType(hookName: hookName),
-            tool: object["tool_name"] as? String,
-            message: object["message"] as? String,
+            type: type,
+            tool: tool,
+            message: message,
             cwd: object["cwd"] as? String,
             transcriptPath: object["transcript_path"] as? String,
             timestamp: receivedAt,
-            isInterrupt: object["is_interrupt"] as? Bool ?? false
+            isInterrupt: object["is_interrupt"] as? Bool ?? false,
+            expectsReply: type == .permissionRequest
         )
     }
 
