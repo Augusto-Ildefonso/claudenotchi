@@ -25,11 +25,25 @@ public struct SessionRegistry {
     /// Whether any open session runs in a terminal; this, not `isEmpty`, decides whether the pill shows.
     public var hasInteractiveSession: Bool { sessions.values.contains { $0.interactive == true } }
 
+    /// Stand-in sessions, for a Claude Code that was already running when the app started and so has sent the
+    /// app nothing yet, are keyed by process.
+    private static let standInPrefix = "process-"
+
+    /// Notes a Claude Code process found running without any hook event from it. Its first real event replaces
+    /// this stand-in, and it goes when the process does.
+    public mutating func noteRunning(pid: Int, interactive: Bool, now: Date) {
+        guard !sessions.values.contains(where: { $0.pid == pid }) else { return }
+        sessions["\(Self.standInPrefix)\(pid)"] = Entry(pid: pid, lastSeen: now, interactive: interactive)
+    }
+
     /// Any event proves the session exists, including one whose start the app missed (it launched later).
     public mutating func handle(_ event: SessionEvent, claudePID: Int?, interactive: Bool? = nil) {
         if event.type == .sessionEnd {
             sessions[event.sessionID] = nil
             return
+        }
+        if let claudePID {
+            sessions = sessions.filter { !($0.key.hasPrefix(Self.standInPrefix) && $0.value.pid == claudePID) }
         }
         var entry = sessions[event.sessionID] ?? Entry(pid: nil, lastSeen: event.timestamp, interactive: nil)
         entry.lastSeen = event.timestamp

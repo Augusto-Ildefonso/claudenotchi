@@ -98,6 +98,17 @@ public enum ProcessAncestry {
         ancestors.contains { isRegularApp($0) || multiplexers.contains(name($0) ?? "") }
     }
 
+    /// The folder a process is working in, or nil when it does not exist or may not be read.
+    public static func currentDirectory(of pid: Int32) -> String? {
+        var info = proc_vnodepathinfo()
+        let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else { return nil }
+        let path = withUnsafeBytes(of: &info.pvi_cdir.vip_path) { raw in
+            String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
+        }
+        return path.isEmpty ? nil : path
+    }
+
     /// Whether a process with this id is alive (a finished process nobody has collected yet does not count).
     public static func isRunning(_ pid: Int) -> Bool {
         guard let info = info(for: Int32(pid)) else { return false }

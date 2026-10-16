@@ -110,6 +110,15 @@ final class CompanionModel {
             }
         })
         tasks.append(Task {
+            // A Claude Code that was already open has sent nothing yet; look for it instead of waiting for it.
+            let found = await Task.detached(priority: .utility) {
+                ProcessScanner.findTerminalSessions { pid in
+                    NSRunningApplication(processIdentifier: pid_t(pid))?.activationPolicy == .regular
+                }
+            }.value
+            adoptRunning(found)
+        })
+        tasks.append(Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
                 let now = Date()
@@ -124,6 +133,21 @@ final class CompanionModel {
             }
         })
         return true
+    }
+
+    /// Takes in the Claude Code sessions found running at launch: the pill shows, and a click can already
+    /// bring their terminal forward, before any hook event arrives.
+    private func adoptRunning(_ found: [RunningClaude]) {
+        log.info("found \(found.count, privacy: .public) Claude Code session(s) already running in a terminal")
+        guard let latest = found.last else { return }
+        for session in found { registry.noteRunning(pid: session.pid, interactive: true, now: Date()) }
+        updateSessionsOpen()
+        // Only fill what no hook event has told us yet.
+        if lastAncestors.isEmpty {
+            lastAncestors = latest.chain
+            lastTTY = latest.tty
+        }
+        if lastCwd == nil, let folder = ProcessAncestry.currentDirectory(of: Int32(latest.pid)) { lastCwd = folder }
     }
 
     func stop() {
