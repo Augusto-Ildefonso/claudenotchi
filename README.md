@@ -25,8 +25,8 @@ Download the latest `Claudenotchi-<version>.dmg` from the Releases page, drag th
 > Until the project has a notarized release, macOS may warn about an unidentified developer; open it from System Settings > Privacy & Security instead. Or build from source:
 
 ```sh
-git clone <this repository>
-cd Claudenotchi
+git clone https://github.com/Augusto-Ildefonso/claudenotchi.git
+cd claudenotchi
 scripts/release.sh          # unsigned universal build -> dist/Claudenotchi-<version>.dmg
 ```
 
