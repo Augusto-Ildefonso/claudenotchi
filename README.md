@@ -8,7 +8,7 @@ A tiny pixel mascot that lives in your MacBook's notch and shows what [Claude Co
 - **Reacts to real events.** It uses Claude Code's official [hooks](https://docs.claude.com/en/docs/claude-code/hooks), not screen scraping.
 - **Permission prompts in the notch.** Approve or Deny a tool call from the notch; questions and plan approvals that need typing are flagged and left for the terminal.
 - **Usage at a glance.** Hover to see the current task, the context window used (`context 83%`) and the estimated session cost.
-- **Only there when needed.** The mascot appears when Claude Code starts and goes away when the last session ends (or its process dies); an option in the menu keeps it always visible.
+- **Only there when needed.** The mascot appears when Claude Code starts in a terminal and goes away when the last terminal session ends (including closing it with Ctrl+C, which sends no hook event); sessions with no terminal, such as background or headless ones, do not keep it on screen but can still ask you for permission. An option in the menu keeps it always visible.
 - **Several sessions.** Every Claude Code session is tracked; the most urgent one drives the mascot.
 - **Works without a notch.** On other displays it becomes a small pill at the top center.
 
@@ -20,17 +20,23 @@ A tiny pixel mascot that lives in your MacBook's notch and shows what [Claude Co
 
 ## Install
 
-Download the latest `Claudenotchi-<version>.dmg` from the Releases page, drag the app to Applications and open it.
+Download the latest `Claudenotchi-<version>.dmg` from the [Releases page](https://github.com/Augusto-Ildefonso/claudenotchi/releases), open it and drag Claudenotchi to Applications.
 
-> Until the project has a notarized release, macOS may warn about an unidentified developer; open it from System Settings > Privacy & Security instead. Or build from source:
+**The releases are not signed or notarized by Apple** (that needs a paid developer account), so macOS blocks the first launch. Allow it once, in either way:
+
+- open the app, then go to **System Settings > Privacy & Security**, scroll down and click **Open Anyway** next to the Claudenotchi message; or
+- in Terminal: `xattr -dr com.apple.quarantine /Applications/Claudenotchi.app`
+
+If you would rather not run an unsigned binary, build it yourself (needs Xcode):
 
 ```sh
 git clone https://github.com/Augusto-Ildefonso/claudenotchi.git
 cd claudenotchi
 scripts/release.sh          # unsigned universal build -> dist/Claudenotchi-<version>.dmg
+VERSION=1.2 scripts/release.sh   # or choose the version (existing DMGs are never overwritten)
 ```
 
-or open `Claudenotchi.xcodeproj` in Xcode and run.
+or open `Claudenotchi.xcodeproj` in Xcode and run. A DMG you build on your own Mac is not quarantined, so it opens normally.
 
 On first launch the app asks to install its hooks. This adds a small entry for each of Claude Code's hook events to `~/.claude/settings.json` (a timestamped backup is made first and existing hooks are left alone). **Uninstall Claude Code hooks** in the menu bar menu removes exactly those entries again.
 
