@@ -78,6 +78,26 @@ public enum ProcessAncestry {
         ancestors.first { looksLikeClaude(arguments: arguments($0) ?? []) }
     }
 
+    /// The command name of a process (`tmux`, `zsh`, ...), or nil when it does not exist.
+    public static func name(of pid: Int32) -> String? {
+        guard var comm = info(for: pid)?.kp_proc.p_comm else { return nil }
+        return withUnsafeBytes(of: &comm) { raw in String(cString: raw.bindMemory(to: CChar.self).baseAddress!) }
+    }
+
+    /// Terminal multiplexers keep the session alive in a detached server, so no terminal app is above it.
+    private static let multiplexers: Set<String> = ["tmux", "screen", "zellij"]
+
+    /// Whether a Claude Code session runs in a terminal the user can see: a regular app (Terminal, iTerm2,
+    /// Ghostty, an editor) or a multiplexer is above it. A background session (a daemon's, the desktop app's)
+    /// has neither.
+    public static func isAttachedToTerminal(
+        ancestors: [Int],
+        isRegularApp: (Int) -> Bool,
+        name: (Int) -> String? = { name(of: Int32($0)) }
+    ) -> Bool {
+        ancestors.contains { isRegularApp($0) || multiplexers.contains(name($0) ?? "") }
+    }
+
     /// Whether a process with this id is alive (a finished process nobody has collected yet does not count).
     public static func isRunning(_ pid: Int) -> Bool {
         guard let info = info(for: Int32(pid)) else { return false }

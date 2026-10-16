@@ -10,6 +10,9 @@ public struct SessionRegistry {
     private struct Entry {
         var pid: Int?
         var lastSeen: Date
+        /// Whether the session runs in a terminal. A background or headless session (a daemon's, the desktop
+        /// app's, `claude -p`) runs the same hooks but is not what the pill is about. nil: not known yet.
+        var interactive: Bool?
     }
 
     private var sessions: [String: Entry] = [:]
@@ -19,15 +22,19 @@ public struct SessionRegistry {
     public var isEmpty: Bool { sessions.isEmpty }
     public var count: Int { sessions.count }
 
+    /// Whether any open session runs in a terminal; this, not `isEmpty`, decides whether the pill shows.
+    public var hasInteractiveSession: Bool { sessions.values.contains { $0.interactive == true } }
+
     /// Any event proves the session exists, including one whose start the app missed (it launched later).
-    public mutating func handle(_ event: SessionEvent, claudePID: Int?) {
+    public mutating func handle(_ event: SessionEvent, claudePID: Int?, interactive: Bool? = nil) {
         if event.type == .sessionEnd {
             sessions[event.sessionID] = nil
             return
         }
-        var entry = sessions[event.sessionID] ?? Entry(pid: nil, lastSeen: event.timestamp)
+        var entry = sessions[event.sessionID] ?? Entry(pid: nil, lastSeen: event.timestamp, interactive: nil)
         entry.lastSeen = event.timestamp
         if let claudePID { entry.pid = claudePID }
+        if let interactive { entry.interactive = interactive } // a helper that ran after claude died knows nothing
         sessions[event.sessionID] = entry
     }
 

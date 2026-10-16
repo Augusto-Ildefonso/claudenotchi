@@ -1,3 +1,4 @@
+import AppKit
 import ClaudenotchiCore
 import Foundation
 import Observation
@@ -200,7 +201,11 @@ final class CompanionModel {
         let promptsBefore = prompts.count
         if let prompt = PendingPrompt(event: event) { prompts.add(prompt) }
         remember(event)
-        registry.handle(event, claudePID: ProcessAncestry.claudePID(in: event.ancestorPIDs))
+        registry.handle(
+            event,
+            claudePID: ProcessAncestry.claudePID(in: event.ancestorPIDs),
+            interactive: Self.isInTerminal(event)
+        )
         updateSessionsOpen()
 
         machine.handle(event)
@@ -218,11 +223,22 @@ final class CompanionModel {
         }
     }
 
+    /// Whether the event comes from a session the user can see in a terminal (a terminal app or multiplexer is
+    /// above it). nil when the event carries no process chain, so it says nothing either way.
+    private static func isInTerminal(_ event: SessionEvent) -> Bool? {
+        guard !event.ancestorPIDs.isEmpty else { return nil }
+        return ProcessAncestry.isAttachedToTerminal(ancestors: event.ancestorPIDs) { pid in
+            NSRunningApplication(processIdentifier: pid_t(pid))?.activationPolicy == .regular
+        }
+    }
+
+    /// The pill is about Claude Code in a terminal; a background session (a daemon's, the desktop app's) runs
+    /// the same hooks but does not keep it on screen.
     private func updateSessionsOpen() {
-        let open = !registry.isEmpty
+        let open = registry.hasInteractiveSession
         if open != sessionsOpen {
             sessionsOpen = open
-            log.info("sessions open: \(self.registry.count, privacy: .public)")
+            log.info("terminal sessions open: \(open, privacy: .public) (sessions of any kind: \(self.registry.count, privacy: .public))")
         }
     }
 

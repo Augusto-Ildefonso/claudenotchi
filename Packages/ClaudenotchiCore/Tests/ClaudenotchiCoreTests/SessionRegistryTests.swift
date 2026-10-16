@@ -116,6 +116,86 @@ import Testing
     }
 }
 
+@Suite struct InteractiveSessionTests {
+    private let t0 = Date(timeIntervalSince1970: 1_000)
+
+    private func event(_ type: SessionEvent.EventType, session: String = "a", at time: Date) -> SessionEvent {
+        SessionEvent(sessionID: session, type: type, timestamp: time)
+    }
+
+    @Test func aSessionInATerminalCountsAsInteractive() {
+        var registry = SessionRegistry()
+        registry.handle(event(.sessionStart, at: t0), claudePID: 100, interactive: true)
+        #expect(registry.hasInteractiveSession)
+    }
+
+    // A background or headless session (the Claude desktop app's, a daemon's, `claude -p`) still runs hooks
+    // and must not keep the pill on screen after the terminal one is closed.
+    @Test func aBackgroundSessionIsOpenButNotInteractive() {
+        var registry = SessionRegistry()
+        registry.handle(event(.sessionStart, at: t0), claudePID: 100, interactive: false)
+        #expect(registry.count == 1)
+        #expect(!registry.hasInteractiveSession)
+    }
+
+    @Test func aSessionWhoseKindIsUnknownDoesNotCountAsInteractive() {
+        var registry = SessionRegistry()
+        registry.handle(event(.postToolUse, at: t0), claudePID: nil)
+        #expect(registry.count == 1)
+        #expect(!registry.hasInteractiveSession)
+    }
+
+    @Test func aLaterEventWithNoProcessInfoKeepsTheKnownKind() {
+        var registry = SessionRegistry()
+        registry.handle(event(.sessionStart, at: t0), claudePID: 100, interactive: true)
+        registry.handle(event(.stop, at: t0 + 1), claudePID: nil, interactive: nil) // a helper that ran after claude died
+        #expect(registry.hasInteractiveSession)
+    }
+
+    @Test func closingTheTerminalSessionHidesEvenWhileABackgroundSessionLives() {
+        var registry = SessionRegistry()
+        registry.handle(event(.sessionStart, session: "terminal", at: t0), claudePID: 100, interactive: true)
+        registry.handle(event(.sessionStart, session: "background", at: t0), claudePID: 200, interactive: false)
+        registry.prune(now: t0 + 1) { $0 == 200 } // the terminal's claude was closed with Ctrl+C
+        #expect(registry.count == 1)
+        #expect(!registry.hasInteractiveSession)
+    }
+
+    @Test func sessionEndOfTheTerminalSessionHidesToo() {
+        var registry = SessionRegistry()
+        registry.handle(event(.sessionStart, session: "terminal", at: t0), claudePID: 100, interactive: true)
+        registry.handle(event(.preToolUse, session: "background", at: t0), claudePID: 200, interactive: false)
+        registry.handle(event(.sessionEnd, session: "terminal", at: t0 + 5), claudePID: 100, interactive: true)
+        #expect(!registry.hasInteractiveSession)
+    }
+}
+
+@Suite struct TerminalAttachmentTests {
+    private let apps: Set<Int> = [900]
+    private func attached(_ chain: [Int], names: [Int: String] = [:]) -> Bool {
+        ProcessAncestry.isAttachedToTerminal(ancestors: chain, isRegularApp: { apps.contains($0) }, name: { names[$0] })
+    }
+
+    @Test func aChainThatEndsInATerminalAppIsAttached() {
+        #expect(attached([10, 11, 12, 900]))
+    }
+
+    @Test func aMultiplexerCountsAsATerminalToo() {
+        #expect(attached([10, 11, 12], names: [12: "tmux"]))
+        #expect(attached([10, 11, 12], names: [11: "screen"]))
+        #expect(attached([10, 11, 12], names: [12: "zellij"]))
+    }
+
+    @Test func aChainWithNoTerminalIsABackgroundSession() {
+        // claude -> zsh -> `claude bg-spare` -> `claude bg-pty-host`, as in a background session
+        #expect(!attached([10, 11, 12, 13], names: [10: "sh", 11: "2.1.300", 12: "zsh", 13: "2.1.300"]))
+    }
+
+    @Test func anEmptyChainIsNotAttached() {
+        #expect(!attached([]))
+    }
+}
+
 @Suite struct ClaudeProcessLookupTests {
     // Real Claude Code reports its version number as the process name (the binary is `versions/2.1.300`),
     // so it is recognised by its command line instead.
